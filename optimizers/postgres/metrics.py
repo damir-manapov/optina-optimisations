@@ -25,14 +25,3 @@ METRICS: dict[str, MetricConfig] = {
         format_spec=".0f",
     ),
 }
-
-
-def get_metric_choices() -> list[str]:
-    """Get list of valid metric names for argparse choices."""
-    return list(METRICS.keys())
-
-
-def get_metric_help() -> str:
-    """Generate help text for --metric argument."""
-    parts = [f"{name}={cfg.description}" for name, cfg in METRICS.items()]
-    return f"Metric to optimize ({', '.join(parts)})"
