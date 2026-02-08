@@ -13,13 +13,20 @@ Deploy benchmark VMs on Selectel or Timeweb Cloud.
 
 ### Selectel
 
-Get credentials from https://my.selectel.ru/profile/apikeys
+1. **Create a service user** at https://my.selectel.ru/iam/service-users:
+   - Assign role `member` in Account access area
+   - Assign role `iam_admin` for project management
+   - Note the username and password
+
+2. **Get your account number** (domain) from the upper right corner of https://my.selectel.ru/
+
+3. **Set environment variables:**
 
 ```bash
-export TF_VAR_selectel_domain="123456"
-export TF_VAR_selectel_username="your-username"
-export TF_VAR_selectel_password="your-password"
-# Generate random password - Terraform uses it to create OpenStack credentials
+export TF_VAR_selectel_domain="123456"              # Account number
+export TF_VAR_selectel_username="service-user"      # Service user name
+export TF_VAR_selectel_password="service-password"  # Service user password
+# Random password for OpenStack user that Terraform will create:
 export TF_VAR_selectel_openstack_password="$(openssl rand -base64 24)"
 
 cd terraform/selectel
