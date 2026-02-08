@@ -24,15 +24,46 @@ This project automates finding optimal configurations for various products on cl
 
 ### Prerequisites
 
+**Required for optimizers:**
 - Python 3.11+ with [uv](https://github.com/astral-sh/uv)
 - [Terraform](https://terraform.io/downloads) >= 1.0
 - Cloud credentials (see [terraform/README.md](terraform/README.md))
 
+**Required for benchmarks:**
+- Node.js 20+
+- [pnpm](https://pnpm.io/) >= 9.0
+- Docker & Docker Compose
+
+**Required for health checks:**
+- [gitleaks](https://github.com/gitleaks/gitleaks) - secrets scanning
+- [jq](https://jqlang.github.io/jq/) - JSON processing
+
+### Installation
+
+```bash
+# macOS
+brew install uv terraform node pnpm gitleaks jq
+brew install --cask docker
+
+# Ubuntu/Debian
+curl -LsSf https://astral.sh/uv/install.sh | sh
+sudo apt install -y terraform nodejs npm jq docker.io docker-compose
+npm install -g pnpm
+# gitleaks: download from https://github.com/gitleaks/gitleaks/releases
+```
+
 ### Setup
 
 ```bash
+# Clone and enter repo
+git clone https://github.com/damir-manapov/optina-optimisations.git
+cd optina-optimisations
+
 # Install Python dependencies
 uv sync
+
+# Install TypeScript dependencies (for benchmarks)
+cd benchmarks && pnpm install && cd ..
 
 # Set cloud credentials (Selectel example)
 export TF_VAR_selectel_domain="123456"
@@ -42,6 +73,10 @@ export TF_VAR_selectel_openstack_password="your-openstack-password"
 
 # Initialize Terraform
 cd terraform/selectel && terraform init && cd ../..
+
+# Verify setup
+./check.sh        # Python linting/types
+./all-checks.sh   # Full checks (requires GITHUB_TOKEN for renovate)
 ```
 
 ### Run Optimization
