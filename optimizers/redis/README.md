@@ -1,65 +1,33 @@
-# Redis Configuration Optimizer
+# Redis Optimizer
 
-Bayesian optimization for finding the best Redis configuration using Optuna.
+Bayesian optimization for Redis configuration.
 
-## How It Works
+## Usage
 
-1. **Optuna suggests** a configuration (mode, CPU, RAM, eviction policy, io-threads, persistence)
-2. **Terraform deploys** Redis single-node or Sentinel cluster
-3. **memtier_benchmark** runs workload (80% GET, 20% SET)
-4. **Results logged** to `results.json`
-5. **Optuna learns** from results and suggests the next config
-6. **Repeat** until trials exhausted
+```bash
+# Optimize for ops/sec
+uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --metric ops_per_sec
 
-## Supported Modes
+# Optimize for p99 latency
+uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --metric p99_latency_ms
+
+# Optimize for cost efficiency
+uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --metric cost_efficiency
+
+# Keep infrastructure after
+uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --no-destroy
+
+# View results
+uv run python optimizers/redis/optimizer.py --cloud selectel --show-results
+uv run python optimizers/redis/optimizer.py --cloud selectel --export-md
+```
+
+## Deployment Modes
 
 | Mode     | Nodes | Description                                         |
 | -------- | ----- | --------------------------------------------------- |
 | single   | 1     | Single Redis instance at 10.0.0.20                  |
 | sentinel | 3     | 1 master + 2 replicas with Sentinel at 10.0.0.20-22 |
-
-## Setup
-
-```bash
-# From project root
-uv sync
-```
-
-## Usage
-
-```bash
-# Optimize for ops/sec (higher is better)
-uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --metric ops_per_sec
-
-# Optimize for p99 latency (lower is better)
-uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --metric p99_latency_ms
-
-# Optimize for cost efficiency (ops/sec per $/hr)
-uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --metric cost_efficiency
-
-# Keep infrastructure after optimization
-uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --no-destroy
-
-# Show all benchmark results
-uv run python optimizers/redis/optimizer.py --cloud selectel --show-results
-
-# Export results to markdown
-uv run python optimizers/redis/optimizer.py --cloud selectel --export-md
-```
-
-### From Scratch
-
-```bash
-# Clear everything and start fresh
-cd terraform/selectel
-terraform destroy -auto-approve
-rm -f terraform.tfstate terraform.tfstate.backup
-cd ../..
-rm -f optimizers/redis/study.db optimizers/redis/results.json
-
-# Run - it will create everything from scratch
-uv run python optimizers/redis/optimizer.py --cloud selectel --trials 5
-```
 
 ## Configuration Space
 
@@ -80,28 +48,10 @@ uv run python optimizers/redis/optimizer.py --cloud selectel --trials 5
 | p99_latency_ms  | Minimize  | 99th percentile latency in ms |
 | cost_efficiency | Maximize  | ops/sec per $/hr              |
 
-### Trial Timings
+## Benchmark
 
-Each trial records phase timings in `results.json`:
-
-- `redis_deploy_s` - Redis cluster deployment time
-- `benchmark_s` - memtier_benchmark execution time
-- `trial_total_s` - Total trial duration
-
-## Benchmark Workload
-
-Uses `memtier_benchmark` with:
-
-- **80% GET / 20% SET** ratio
+memtier_benchmark with:
+- 80% GET / 20% SET
 - 16 threads, 50 connections per thread
 - 10,000 requests per connection
-- Random keys with 256-byte values
-
-## Infrastructure
-
-Redis nodes are deployed at:
-
-- **Single mode**: 10.0.0.20
-- **Sentinel mode**: 10.0.0.20 (master), 10.0.0.21-22 (replicas)
-
-Benchmark VM connects from the same subnet to minimize network latency.
+- Random keys, 256-byte values
