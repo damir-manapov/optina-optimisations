@@ -328,6 +328,121 @@ def find_cached_result(config: dict, cloud: str) -> dict | None:
     return None
 
 
+def load_historical_trials(study: optuna.Study, cloud: str, metric: str) -> int:
+    """Load historical results into Optuna study as completed trials.
+
+    This helps Optuna make better suggestions by learning from past results.
+    Returns the number of trials loaded.
+    """
+    rf = results_file()
+    if not rf.exists():
+        return 0
+
+    results = load_results(rf)
+    if not results:
+        return 0
+
+    # Filter results for this cloud that have valid throughput
+    valid_results = [
+        r
+        for r in results
+        if r.get("cloud") == cloud
+        and not r.get("error")
+        and r.get("total_mib_s", 0) > 0
+        and r.get("config", {}).get("cpu_per_node")
+    ]
+
+    if not valid_results:
+        return 0
+
+    config_space = get_config_space(cloud)
+    loaded = 0
+    seen_configs = set()
+
+    for result in valid_results:
+        config = result.get("config", {})
+
+        # Create a unique key to avoid duplicates
+        config_key = config_to_key(config, cloud)
+        if config_key in seen_configs:
+            continue
+        seen_configs.add(config_key)
+
+        nodes = config.get("nodes")
+        cpu = config.get("cpu_per_node")
+        ram = config.get("ram_per_node")
+        drives = config.get("drives_per_node")
+        drive_size = config.get("drive_size_gb")
+        drive_type = config.get("drive_type")
+
+        # Validate all values are in search space
+        if nodes not in config_space["nodes"]:
+            continue
+        if cpu not in config_space["cpu_per_node"]:
+            continue
+        if drives not in config_space["drives_per_node"]:
+            continue
+        if drive_size not in config_space["drive_size_gb"]:
+            continue
+        if drive_type not in config_space["drive_type"]:
+            continue
+
+        # Check RAM is valid for this CPU
+        valid_ram = filter_valid_ram(cloud, cpu, config_space["ram_per_node"])
+        if ram not in valid_ram:
+            continue
+
+        # Build params with CPU-specific RAM param name (matches objective function)
+        params = {
+            "nodes": nodes,
+            "cpu_per_node": cpu,
+            f"ram_per_node_cpu{cpu}": ram,
+            "drives_per_node": drives,
+            "drive_size_gb": drive_size,
+            "drive_type": drive_type,
+        }
+
+        # Build distributions
+        distributions = {
+            "nodes": optuna.distributions.CategoricalDistribution(
+                config_space["nodes"]
+            ),
+            "cpu_per_node": optuna.distributions.CategoricalDistribution(
+                config_space["cpu_per_node"]
+            ),
+            f"ram_per_node_cpu{cpu}": optuna.distributions.CategoricalDistribution(
+                valid_ram
+            ),
+            "drives_per_node": optuna.distributions.CategoricalDistribution(
+                config_space["drives_per_node"]
+            ),
+            "drive_size_gb": optuna.distributions.CategoricalDistribution(
+                config_space["drive_size_gb"]
+            ),
+            "drive_type": optuna.distributions.CategoricalDistribution(
+                config_space["drive_type"]
+            ),
+        }
+
+        # Calculate metric value
+        value = get_metric_value(result, metric)
+
+        # Create and add trial
+        try:
+            trial = optuna.trial.create_trial(
+                params=params,
+                distributions=dict(distributions),  # type: ignore[arg-type]
+                values=[value],
+            )
+            study.add_trial(trial)
+            loaded += 1
+        except Exception as e:
+            print(f"  Warning: Could not add historical trial: {e}")
+            continue
+
+    return loaded
+
+
 def wait_for_minio_ready(
     vm_ip: str, minio_ip: str = "10.0.0.10", timeout: int = 300
 ) -> bool:
@@ -1132,6 +1247,11 @@ Examples:
         sampler=TPESampler(seed=42),
         load_if_exists=True,
     )
+
+    # Load historical results into study for better suggestions
+    n_loaded = load_historical_trials(study, args.cloud, args.metric)
+    if n_loaded > 0:
+        print(f"Loaded {n_loaded} historical trials from results.json")
 
     existing_trials = len(study.trials)
     if existing_trials > 0:

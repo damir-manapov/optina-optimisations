@@ -278,6 +278,119 @@ def find_cached_result(config: dict, cloud: str) -> dict | None:
     return None
 
 
+def load_historical_trials(study: optuna.Study, cloud: str, metric: str) -> int:
+    """Load historical results into Optuna study as completed trials.
+
+    This helps Optuna make better suggestions by learning from past results.
+    Returns the number of trials loaded.
+    """
+    rf = results_file()
+    if not rf.exists():
+        return 0
+
+    results = load_results(rf)
+    if not results:
+        return 0
+
+    # Filter results for this cloud that have valid ops
+    valid_results = [
+        r
+        for r in results
+        if r.get("cloud") == cloud
+        and not r.get("error")
+        and r.get("ops_per_sec", 0) > 0
+        and r.get("config", {}).get("cpu_per_node")
+    ]
+
+    if not valid_results:
+        return 0
+
+    config_space = get_config_space(cloud)
+    loaded = 0
+    seen_configs = set()
+
+    for result in valid_results:
+        config = result.get("config", {})
+
+        # Create a unique key to avoid duplicates
+        config_key = config_to_key(config, cloud)
+        if config_key in seen_configs:
+            continue
+        seen_configs.add(config_key)
+
+        cpu = config.get("cpu_per_node")
+        ram = config.get("ram_per_node")
+        mode = config.get("mode")
+        policy = config.get("maxmemory_policy")
+        io_threads = config.get("io_threads")
+        persistence = config.get("persistence")
+
+        # Validate all values are in search space
+        if cpu not in config_space["cpu_per_node"]:
+            continue
+        if mode not in config_space["mode"]:
+            continue
+        if policy not in config_space["maxmemory_policy"]:
+            continue
+        if io_threads not in config_space["io_threads"]:
+            continue
+        if persistence not in config_space["persistence"]:
+            continue
+
+        # Check RAM is valid for this CPU
+        valid_ram = filter_valid_ram(cloud, cpu, config_space["ram_per_node"])
+        if ram not in valid_ram:
+            continue
+
+        # Build params with CPU-specific RAM param name (matches objective function)
+        params = {
+            "cpu_per_node": cpu,
+            f"ram_per_node_cpu{cpu}": ram,
+            "mode": mode,
+            "maxmemory_policy": policy,
+            "io_threads": io_threads,
+            "persistence": persistence,
+        }
+
+        # Build distributions
+        distributions = {
+            "cpu_per_node": optuna.distributions.CategoricalDistribution(
+                config_space["cpu_per_node"]
+            ),
+            f"ram_per_node_cpu{cpu}": optuna.distributions.CategoricalDistribution(
+                valid_ram
+            ),
+            "mode": optuna.distributions.CategoricalDistribution(config_space["mode"]),
+            "maxmemory_policy": optuna.distributions.CategoricalDistribution(
+                config_space["maxmemory_policy"]
+            ),
+            "io_threads": optuna.distributions.CategoricalDistribution(
+                config_space["io_threads"]
+            ),
+            "persistence": optuna.distributions.CategoricalDistribution(
+                config_space["persistence"]
+            ),
+        }
+
+        # Calculate metric value
+        value = get_metric_value(result, metric)
+
+        # Create and add trial
+        try:
+            trial = optuna.trial.create_trial(
+                params=params,
+                distributions=dict(distributions),  # type: ignore[arg-type]
+                values=[value],
+            )
+            study.add_trial(trial)
+            loaded += 1
+        except Exception as e:
+            print(f"  Warning: Could not add historical trial: {e}")
+            continue
+
+    return loaded
+
+
 def wait_for_redis_ready(
     vm_ip: str, redis_ip: str = "10.0.0.20", timeout: int = 180
 ) -> bool:
@@ -739,6 +852,11 @@ Examples:
         sampler=TPESampler(seed=42),
         load_if_exists=True,
     )
+
+    # Load historical results into study for better suggestions
+    n_loaded = load_historical_trials(study, args.cloud, args.metric)
+    if n_loaded > 0:
+        print(f"Loaded {n_loaded} historical trials from results.json")
 
     existing_trials = len(study.trials)
     if existing_trials > 0:

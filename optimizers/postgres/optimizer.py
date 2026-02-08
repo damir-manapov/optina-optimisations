@@ -131,6 +131,153 @@ def find_cached_result(infra: dict, pg_config: dict, cloud: str) -> dict | None:
     return None
 
 
+def load_historical_trials(
+    study: optuna.Study,
+    cloud: str,
+    mode: str,
+    metric: str,
+    fixed_ram_gb: int | None = None,
+) -> int:
+    """Load historical results into Optuna study as completed trials.
+
+    This helps Optuna make better suggestions by learning from past results.
+    Returns the number of trials loaded.
+
+    Args:
+        study: Optuna study to add trials to
+        cloud: Cloud provider name
+        mode: 'infra' or 'config'
+        metric: Metric being optimized
+        fixed_ram_gb: For config mode, the fixed RAM to filter results by
+    """
+    rf = results_file()
+    if not rf.exists():
+        return 0
+
+    results = load_results(rf)
+    if not results:
+        return 0
+
+    # Filter results for this cloud that have valid TPS
+    valid_results = [
+        r
+        for r in results
+        if r.get("cloud") == cloud
+        and not r.get("error")
+        and r.get("tps", 0) > 0
+        and r.get("infra_config", {}).get("cpu")
+    ]
+
+    if not valid_results:
+        return 0
+
+    infra_space = get_infra_search_space(cloud)
+    loaded = 0
+    seen_configs = set()
+
+    for result in valid_results:
+        infra = result.get("infra_config", {})
+        pg_config = result.get("pg_config", {})
+
+        # Create a unique key to avoid duplicates
+        config_key = config_to_key(infra, pg_config, cloud)
+        if config_key in seen_configs:
+            continue
+        seen_configs.add(config_key)
+
+        params: dict = {}
+        distributions: dict = {}
+
+        cpu = infra.get("cpu")
+        ram = infra.get("ram_gb")
+        disk_type = infra.get("disk_type")
+        disk_size = infra.get("disk_size_gb")
+        infra_mode = infra.get("mode")
+
+        if mode == "infra":
+            # Infrastructure optimization - load infra params
+            if cpu not in infra_space["cpu"]:
+                continue
+            if disk_type not in infra_space["disk_type"]:
+                continue
+            if disk_size not in infra_space["disk_size_gb"]:
+                continue
+            if infra_mode not in infra_space["mode"]:
+                continue
+
+            valid_ram = filter_valid_ram(cloud, cpu, infra_space["ram_gb"])
+            if ram not in valid_ram:
+                continue
+
+            params = {
+                "cpu": cpu,
+                f"ram_gb_cpu{cpu}": ram,
+                "disk_type": disk_type,
+                "disk_size_gb": disk_size,
+                "mode": infra_mode,
+            }
+
+            distributions = {
+                "cpu": optuna.distributions.CategoricalDistribution(infra_space["cpu"]),
+                f"ram_gb_cpu{cpu}": optuna.distributions.CategoricalDistribution(
+                    valid_ram
+                ),
+                "disk_type": optuna.distributions.CategoricalDistribution(
+                    infra_space["disk_type"]
+                ),
+                "disk_size_gb": optuna.distributions.CategoricalDistribution(
+                    infra_space["disk_size_gb"]
+                ),
+                "mode": optuna.distributions.CategoricalDistribution(
+                    infra_space["mode"]
+                ),
+            }
+
+        elif mode == "config":
+            # Config optimization - load pg_config params for matching RAM
+            if fixed_ram_gb is not None and ram != fixed_ram_gb:
+                continue
+
+            config_space = get_config_search_space(ram)
+
+            # Validate all pg_config values are in search space
+            valid = True
+            for key, value in pg_config.items():
+                if key in config_space and value not in config_space[key]:
+                    valid = False
+                    break
+            if not valid:
+                continue
+
+            params = dict(pg_config)
+            distributions = {
+                key: optuna.distributions.CategoricalDistribution(config_space[key])
+                for key in pg_config.keys()
+                if key in config_space
+            }
+
+        if not params:
+            continue
+
+        # Calculate metric value
+        value = get_metric_value(result, metric)
+
+        # Create and add trial
+        try:
+            trial = optuna.trial.create_trial(
+                params=params,
+                distributions=distributions,
+                values=[value],
+            )
+            study.add_trial(trial)
+            loaded += 1
+        except Exception as e:
+            print(f"  Warning: Could not add historical trial: {e}")
+            continue
+
+    return loaded
+
+
 def generate_postgresql_conf(pg_config: dict, ram_gb: int) -> str:
     """Generate postgresql.conf tuning content."""
     # Calculate memory values
@@ -1013,6 +1160,11 @@ Examples:
                 sampler=TPESampler(seed=42),
             )
 
+            # Load historical results into study for better suggestions
+            n_loaded = load_historical_trials(study, args.cloud, "infra", args.metric)
+            if n_loaded > 0:
+                print(f"Loaded {n_loaded} historical trials from results.json")
+
             study.optimize(
                 lambda trial: objective_infra(
                     trial, args.cloud, cloud_config, args.metric
@@ -1049,6 +1201,13 @@ Examples:
                 sampler=TPESampler(seed=42),
             )
 
+            # Load historical results into study for better suggestions
+            n_loaded = load_historical_trials(
+                study, args.cloud, "config", args.metric, args.ram
+            )
+            if n_loaded > 0:
+                print(f"Loaded {n_loaded} historical trials from results.json")
+
             study.optimize(
                 lambda trial: objective_config(
                     trial,
@@ -1074,6 +1233,13 @@ Examples:
                 direction="maximize",
                 sampler=TPESampler(seed=42),
             )
+
+            # Load historical results into study for better suggestions
+            n_loaded = load_historical_trials(
+                study_infra, args.cloud, "infra", args.metric
+            )
+            if n_loaded > 0:
+                print(f"Loaded {n_loaded} historical trials from results.json")
 
             infra_trials = max(5, args.trials // 3)
             study_infra.optimize(
@@ -1110,6 +1276,13 @@ Examples:
                 direction="maximize" if args.metric != "latency_avg_ms" else "minimize",
                 sampler=TPESampler(seed=42),
             )
+
+            # Load historical results into study for better suggestions
+            n_loaded = load_historical_trials(
+                study_config, args.cloud, "config", args.metric, infra_config["ram_gb"]
+            )
+            if n_loaded > 0:
+                print(f"Loaded {n_loaded} historical trials from results.json")
 
             config_trials = args.trials - infra_trials
             study_config.optimize(
