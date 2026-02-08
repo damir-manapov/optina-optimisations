@@ -33,11 +33,10 @@ from common import (
     destroy_all,
     get_terraform,
     get_tf_output,
-    load_results,
     run_ssh_command,
-    save_results,
     wait_for_vm_ready,
 )
+from storage import TrialStore
 
 from optimizers.redis.cloud_config import (
     CloudConfig,
@@ -61,7 +60,8 @@ def config_summary(r: dict) -> str:
 
 def format_results(cloud: str) -> dict | None:
     """Format benchmark results for display/export. Returns None if no results."""
-    results = load_results(results_file())
+    store = get_store()
+    results = store.as_dicts()
 
     if not results:
         return None
@@ -211,6 +211,11 @@ def results_file() -> Path:
     return RESULTS_DIR / "results.json"
 
 
+def get_store() -> TrialStore:
+    """Get the TrialStore for Redis results."""
+    return TrialStore(results_file(), service="redis")
+
+
 @dataclass
 class MemtierResult:
     """Memtier benchmark results."""
@@ -267,14 +272,15 @@ def config_to_key(config: dict, cloud: str) -> str:
 def find_cached_result(config: dict, cloud: str) -> dict | None:
     """Find a cached successful result for the given config."""
     target_key = config_to_key(config, cloud)
-    for result in load_results(results_file()):
-        if config_to_key(result["config"], result.get("cloud", "")) == target_key:
-            if result.get("error"):
-                return None
-            if result.get("ops_per_sec", 0) <= 0:
-                return None
-            return result
-    return None
+    store = get_store()
+    trial = store.find_by_config_key(target_key)
+    if trial is None:
+        return None
+    if trial.error:
+        return None
+    if (trial.ops_per_sec or 0) <= 0:
+        return None
+    return trial.model_dump()
 
 
 def load_historical_trials(study: optuna.Study, cloud: str, metric: str) -> int:
@@ -283,18 +289,14 @@ def load_historical_trials(study: optuna.Study, cloud: str, metric: str) -> int:
     This helps Optuna make better suggestions by learning from past results.
     Returns the number of trials loaded.
     """
-    rf = results_file()
-    if not rf.exists():
-        return 0
-
-    results = load_results(rf)
-    if not results:
+    store = get_store()
+    if store.count() == 0:
         return 0
 
     # Filter results for this cloud that have valid ops
     valid_results = [
         r
-        for r in results
+        for r in store.as_dicts()
         if r.get("cloud") == cloud
         and not r.get("error")
         and r.get("ops_per_sec", 0) > 0
@@ -607,7 +609,7 @@ def save_result(
     cloud_config: CloudConfig,
 ) -> None:
     """Save benchmark result to JSON file."""
-    results = load_results(results_file())
+    store = get_store()
 
     timings_dict = None
     if result.timings:
@@ -617,7 +619,7 @@ def save_result(
             "trial_total_s": result.timings.trial_total_s,
         }
 
-    results.append(
+    store.add_dict(
         {
             "trial": trial_number,
             "timestamp": datetime.now().isoformat(),
@@ -635,8 +637,6 @@ def save_result(
             "timings": timings_dict,
         }
     )
-
-    save_results(results, results_file())
 
     # Auto-export markdown after each trial
     export_results_md(cloud)

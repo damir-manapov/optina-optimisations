@@ -1,10 +1,8 @@
 """Common utilities shared between optimizers."""
 
-import json
 import subprocess
 import time
 from pathlib import Path
-from typing import Any
 
 from python_terraform import Terraform
 
@@ -126,20 +124,6 @@ def validate_vm_exists(vm_ip: str) -> bool:
         return code == 0
     except Exception:
         return False
-
-
-def load_results(results_path: Path) -> list[dict[str, Any]]:
-    """Load results from a JSON file."""
-    if results_path.exists():
-        with open(results_path) as f:
-            return json.load(f)
-    return []
-
-
-def save_results(results: list[dict[str, Any]], results_path: Path) -> None:
-    """Save results to a JSON file."""
-    with open(results_path, "w") as f:
-        json.dump(results, f, indent=2)
 
 
 def get_terraform(terraform_dir: Path) -> Terraform:

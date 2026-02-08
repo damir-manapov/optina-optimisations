@@ -36,14 +36,13 @@ from common import (
     destroy_all,
     get_terraform,
     get_tf_output,
-    load_results,
     run_ssh_command,
-    save_results,
     wait_for_vm_ready,
 )
 from metrics import get_metric_value
 from optimizers.meilisearch.metrics import METRICS
 from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram
+from storage import TrialStore
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
@@ -476,6 +475,11 @@ def results_file() -> Path:
     return RESULTS_DIR / "results.json"
 
 
+def get_store() -> TrialStore:
+    """Get the TrialStore for Meilisearch results."""
+    return TrialStore(results_file(), service="meilisearch")
+
+
 def config_to_key(infra: dict, meili_config: dict, cloud: str) -> str:
     """Convert config dicts to a hashable key for deduplication."""
     return json.dumps(
@@ -486,21 +490,15 @@ def config_to_key(infra: dict, meili_config: dict, cloud: str) -> str:
 def find_cached_result(infra: dict, meili_config: dict, cloud: str) -> dict | None:
     """Find a cached successful result for the given config."""
     target_key = config_to_key(infra, meili_config, cloud)
-
-    rf = results_file()
-    if not rf.exists():
+    store = get_store()
+    trial = store.find_by_config_key(target_key)
+    if trial is None:
         return None
-    for result in load_results(rf):
-        result_key = config_to_key(
-            result.get("infra", {}), result.get("config", {}), result.get("cloud", "")
-        )
-        if result_key == target_key:
-            if result.get("error"):
-                continue  # Skip errored, try next
-            if result.get("qps", 0) <= 0:
-                continue  # Skip failed, try next
-            return result
-    return None
+    if trial.error:
+        return None
+    if (trial.qps or 0) <= 0:
+        return None
+    return trial.model_dump()
 
 
 def save_result(
@@ -513,8 +511,7 @@ def save_result(
     indexing_time: float = 0,
 ):
     """Save benchmark result."""
-    rf = results_file()
-    results = load_results(rf)
+    store = get_store()
 
     timings_dict = None
     if result.timings:
@@ -528,7 +525,7 @@ def save_result(
             "trial_total_s": result.timings.trial_total_s,
         }
 
-    results.append(
+    store.add_dict(
         {
             "trial": trial_num,
             "timestamp": datetime.now().isoformat(),
@@ -545,8 +542,6 @@ def save_result(
             "timings": timings_dict,
         }
     )
-
-    save_results(results, rf)
 
     # Auto-export markdown after each trial
     export_results_md(cloud)
@@ -568,7 +563,8 @@ def config_summary(r: dict) -> str:
 
 def format_results(cloud: str) -> dict | None:
     """Format benchmark results for display/export. Returns None if no results."""
-    results = load_results(results_file())
+    store = get_store()
+    results = store.as_dicts()
 
     # Filter by cloud
     results = [r for r in results if r.get("cloud", "") == cloud]
@@ -746,13 +742,11 @@ def load_historical_trials(
     This helps Optuna make better suggestions by learning from past results.
     Returns the number of trials loaded.
     """
-    rf = results_file()
-    if not rf.exists():
+    store = get_store()
+    if store.count() == 0:
         return 0
 
-    results = load_results(rf)
-    if not results:
-        return 0
+    results = store.as_dicts()
 
     # Filter results for this cloud that have valid QPS
     valid_results = [

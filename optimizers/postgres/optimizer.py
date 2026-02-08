@@ -41,11 +41,10 @@ from common import (
     destroy_all,
     get_terraform,
     get_tf_output,
-    load_results,
     run_ssh_command,
-    save_results,
     wait_for_vm_ready,
 )
+from storage import TrialStore
 
 from optimizers.postgres.cloud_config import (
     CloudConfig,
@@ -105,6 +104,11 @@ def results_file() -> Path:
     return RESULTS_DIR / "results.json"
 
 
+def get_store() -> TrialStore:
+    """Get the TrialStore for Postgres results."""
+    return TrialStore(results_file(), service="postgres")
+
+
 def config_to_key(infra: dict, pg_config: dict, cloud: str) -> str:
     """Convert config dicts to a hashable key for deduplication."""
     return json.dumps({"cloud": cloud, "infra": infra, "pg": pg_config}, sort_keys=True)
@@ -113,19 +117,15 @@ def config_to_key(infra: dict, pg_config: dict, cloud: str) -> str:
 def find_cached_result(infra: dict, pg_config: dict, cloud: str) -> dict | None:
     """Find a cached successful result for the given config."""
     target_key = config_to_key(infra, pg_config, cloud)
-    for result in load_results(results_file()):
-        result_key = config_to_key(
-            result.get("infra_config", {}),
-            result.get("pg_config", {}),
-            result.get("cloud", ""),
-        )
-        if result_key == target_key:
-            if result.get("error"):
-                return None
-            if result.get("tps", 0) <= 0:
-                return None
-            return result
-    return None
+    store = get_store()
+    trial = store.find_by_config_key(target_key)
+    if trial is None:
+        return None
+    if trial.error:
+        return None
+    if (trial.tps or 0) <= 0:
+        return None
+    return trial.model_dump()
 
 
 def load_historical_trials(
@@ -147,18 +147,14 @@ def load_historical_trials(
         metric: Metric being optimized
         fixed_ram_gb: For config mode, the fixed RAM to filter results by
     """
-    rf = results_file()
-    if not rf.exists():
-        return 0
-
-    results = load_results(rf)
-    if not results:
+    store = get_store()
+    if store.count() == 0:
         return 0
 
     # Filter results for this cloud that have valid TPS
     valid_results = [
         r
-        for r in results
+        for r in store.as_dicts()
         if r.get("cloud") == cloud
         and not r.get("error")
         and r.get("tps", 0) > 0
@@ -666,7 +662,7 @@ def save_result(
     cloud_config: CloudConfig,
 ) -> None:
     """Save benchmark result to JSON file."""
-    results = load_results(results_file())
+    store = get_store()
 
     timings_dict = None
     if result.timings:
@@ -679,7 +675,7 @@ def save_result(
             "trial_total_s": result.timings.trial_total_s,
         }
 
-    results.append(
+    store.add_dict(
         {
             "trial": trial_number,
             "timestamp": datetime.now().isoformat(),
@@ -697,8 +693,6 @@ def save_result(
         }
     )
 
-    save_results(results, results_file())
-
     # Auto-export markdown after each trial
     export_results_md(cloud)
 
@@ -715,7 +709,8 @@ def pg_summary(c: dict) -> str:
 
 def format_results(cloud: str) -> dict | None:
     """Format benchmark results for display."""
-    results = load_results(results_file())
+    store = get_store()
+    results = store.as_dicts()
     if not results:
         return None
 
