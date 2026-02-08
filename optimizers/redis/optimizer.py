@@ -741,63 +741,31 @@ def main():
         epilog="""
 Examples:
   # Optimize for throughput
-  uv run python redis-optimizer/optimizer.py --cloud selectel --trials 10 --metric ops_per_sec
+  uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --metric ops_per_sec
 
   # Optimize for latency
-  uv run python redis-optimizer/optimizer.py --cloud selectel --trials 10 --metric p99_latency_ms
+  uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --metric p99_latency_ms
 
   # Keep infrastructure after optimization
-  uv run python redis-optimizer/optimizer.py --cloud selectel --trials 10 --no-destroy
+  uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --no-destroy
 
   # Show all results
-  uv run python redis-optimizer/optimizer.py --cloud selectel --show-results
+  uv run python optimizers/redis/optimizer.py --cloud selectel --show-results
 
   # Export results to markdown
-  uv run python redis-optimizer/optimizer.py --cloud selectel --export-md
+  uv run python optimizers/redis/optimizer.py --cloud selectel --export-md
         """,
     )
-    parser.add_argument(
-        "--cloud",
-        choices=["selectel", "timeweb"],
-        required=True,
-        help="Cloud provider",
-    )
-    parser.add_argument(
-        "--metric",
-        choices=list(METRICS.keys()),
-        default="ops_per_sec",
-        help="Metric to optimize (default: ops_per_sec)",
-    )
-    parser.add_argument(
-        "--trials",
-        type=int,
-        default=10,
-        help="Number of trials (default: 10)",
-    )
-    parser.add_argument(
-        "--benchmark-vm-ip",
-        default=None,
-        help="Benchmark VM IP (auto-created if not provided)",
-    )
-    parser.add_argument(
-        "--study-name",
-        default=None,
-        help="Optuna study name (default: redis-{cloud}-{metric})",
-    )
-    parser.add_argument(
-        "--no-destroy",
-        action="store_true",
-        help="Keep infrastructure after optimization",
-    )
-    parser.add_argument(
-        "--show-results",
-        action="store_true",
-        help="Show all benchmark results and exit",
-    )
-    parser.add_argument(
-        "--export-md",
-        action="store_true",
-        help="Export results to markdown file and exit",
+
+    # Use common argument helpers
+    from argparse_helpers import add_common_arguments
+
+    add_common_arguments(
+        parser,
+        metrics=METRICS,
+        default_metric="ops_per_sec",
+        default_trials=10,
+        study_prefix="redis",
     )
     args = parser.parse_args()
 
