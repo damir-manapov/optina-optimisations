@@ -1127,7 +1127,7 @@ def objective(
     return metric_value
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Multi-Cloud MinIO Optimizer",
         formatter_class=argparse.RawDescriptionHelpFormatter,

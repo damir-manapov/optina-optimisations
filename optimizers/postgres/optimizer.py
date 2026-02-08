@@ -1084,7 +1084,7 @@ def objective_config(
     )
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Postgres configuration optimizer",
         formatter_class=argparse.RawDescriptionHelpFormatter,

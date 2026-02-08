@@ -734,7 +734,7 @@ def objective(
     return metric_value
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Multi-Cloud Redis Optimizer",
         formatter_class=argparse.RawDescriptionHelpFormatter,

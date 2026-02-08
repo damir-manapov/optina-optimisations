@@ -92,7 +92,7 @@ def get_infra_search_space():
     }
 
 
-def get_config_search_space():
+def get_config_search_space() -> dict[str, list[int]]:
     return {
         "max_indexing_memory_mb": [256, 512, 1024, 2048],
         "max_indexing_threads": [0, 2, 4, 8],  # 0 = auto
@@ -1065,7 +1065,7 @@ curl -sf -X DELETE 'http://{meili_ip}:7700/indexes/products' \\
         return result.qps
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Meilisearch Configuration Optimizer")
 
     # Use common argument helpers
