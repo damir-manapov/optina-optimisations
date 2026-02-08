@@ -228,3 +228,77 @@ class TestGetMetricValue:
         result = {"ops_per_sec": 50000, "p99_latency_ms": 2.5}
         assert get_metric_value(result, "ops_per_sec", METRICS) == 50000
         assert get_metric_value(result, "p99_latency_ms", METRICS) == -2.5
+
+    def test_result_key_alternate_lookup(self) -> None:
+        """Metric with result_key should use alternate key for lookup."""
+        metrics = {
+            "indexing_time": MetricConfig(
+                name="indexing_time",
+                description="Indexing time",
+                direction=Direction.MINIMIZE,
+                unit="s",
+                result_key="indexing_time_s",  # Different key in results
+            )
+        }
+        result = {"indexing_time_s": 5.0}  # Note: using the alternate key
+        # Should find value via result_key and negate (MINIMIZE)
+        assert get_metric_value(result, "indexing_time", metrics) == -5.0
+
+    def test_extractor_function(self) -> None:
+        """Metric with extractor should use custom function."""
+        metrics = {
+            "efficiency": MetricConfig(
+                name="efficiency",
+                description="Calculated efficiency",
+                direction=Direction.MAXIMIZE,
+                unit="ops/$",
+                extractor=lambda r, **kw: r.get("ops", 0) / r.get("cost", 1),
+            )
+        }
+        result = {"ops": 1000, "cost": 10}
+        assert get_metric_value(result, "efficiency", metrics) == 100.0
+
+    def test_extractor_with_kwargs(self) -> None:
+        """Extractor should receive kwargs passed to get_metric_value."""
+        received_kwargs: dict = {}
+
+        def capture_extractor(result: dict, **kwargs) -> float:
+            received_kwargs.update(kwargs)
+            return result.get("value", 0)
+
+        metrics = {
+            "test": MetricConfig(
+                name="test",
+                description="Test",
+                direction=Direction.MAXIMIZE,
+                unit="x",
+                extractor=capture_extractor,
+            )
+        }
+        result = {"value": 42.0}
+        get_metric_value(result, "test", metrics, cloud="selectel", extra="arg")
+        assert received_kwargs["cloud"] == "selectel"
+        assert received_kwargs["extra"] == "arg"
+
+    def test_meilisearch_indexing_time_uses_result_key(self) -> None:
+        """Meilisearch indexing_time should use result_key for lookup."""
+        from optimizers.meilisearch.metrics import METRICS
+
+        result = {"indexing_time_s": 12.5}
+        # Should use result_key="indexing_time_s" and negate (MINIMIZE)
+        assert get_metric_value(result, "indexing_time", METRICS) == -12.5
+
+    def test_meilisearch_cost_efficiency_uses_extractor(self) -> None:
+        """Meilisearch cost_efficiency should calculate from qps and infra."""
+        from optimizers.meilisearch.metrics import METRICS
+
+        result = {
+            "qps": 1000,
+            "infra": {"cpu": 2, "ram_gb": 4, "disk_size_gb": 50, "disk_type": "fast"},
+        }
+        # extractor calculates qps / cost
+        value = get_metric_value(result, "cost_efficiency", METRICS, cloud="selectel")
+        assert value > 0  # Should calculate something
+        # With 2cpu/4gb/50gb fast disk on selectel: ~4212₽/mo
+        # 1000 qps / 4212 ≈ 0.237
+        assert 0.1 < value < 0.5

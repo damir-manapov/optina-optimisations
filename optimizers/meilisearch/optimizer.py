@@ -40,7 +40,7 @@ from common import (
     save_results,
     wait_for_vm_ready,
 )
-from metrics import get_metric_value as _base_get_metric_value
+from metrics import get_metric_value
 from optimizers.meilisearch.metrics import METRICS
 from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram, get_cloud_pricing
 
@@ -539,25 +539,6 @@ def find_cached_result(infra: dict, meili_config: dict, cloud: str) -> dict | No
     return None
 
 
-def get_metric_value(result: dict, metric: str, cloud: str = "selectel") -> float:
-    """Extract the optimization metric value from a result.
-
-    Handles special cases for Meilisearch, then delegates to base function.
-    """
-    # Handle special case: cost_efficiency is calculated on-the-fly
-    if metric == "cost_efficiency":
-        qps = result.get("qps", 0)
-        infra = result.get("infra", {})
-        cost = calculate_cost(infra, cloud)
-        return qps / cost if cost > 0 else 0
-
-    # Handle special case: indexing_time uses different key
-    if metric == "indexing_time":
-        result = {**result, "indexing_time": result.get("indexing_time_s", 0)}
-
-    return _base_get_metric_value(result, metric, METRICS)
-
-
 def save_result(
     result: BenchmarkResult,
     infra_config: dict,
@@ -901,7 +882,7 @@ def load_historical_trials(
             continue
 
         # Calculate metric value
-        value = get_metric_value(result, metric, cloud)
+        value = get_metric_value(result, metric, METRICS, cloud=cloud)
 
         # Create and add trial
         try:
@@ -949,7 +930,7 @@ def objective_infra(
     # Check cache - return cached value so Optuna learns from it
     cached = find_cached_result(infra_config, {}, cloud)
     if cached:
-        cached_value = get_metric_value(cached, metric, cloud)
+        cached_value = get_metric_value(cached, metric, METRICS, cloud=cloud)
         print(f"  Using cached result: {cached_value:.2f} ({metric})")
         return cached_value
 
@@ -1053,7 +1034,7 @@ def objective_config(
     # Check cache - return cached value so Optuna learns from it
     cached = find_cached_result(infra_config, config, cloud)
     if cached:
-        cached_value = get_metric_value(cached, metric, cloud)
+        cached_value = get_metric_value(cached, metric, METRICS, cloud=cloud)
         print(f"  Using cached result: {cached_value:.2f} ({metric})")
         return cached_value
 
