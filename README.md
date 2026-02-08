@@ -70,12 +70,18 @@ optina-optimisations/
 │   ├── redis/
 │   ├── minio/
 │   ├── postgres/
-│   └── meilisearch/
+│   ├── meilisearch/
+│   └── storage/          # Trial persistence (Pydantic models)
 ├── terraform/            # Cloud infrastructure
 │   ├── selectel/
 │   └── timeweb/
 ├── benchmarks/           # Database query benchmarks (TypeScript)
-├── pricing.py            # Cloud pricing data
+├── tests/                # Shared module tests
+├── argparse_helpers.py   # Common CLI argument definitions
+├── cloud_config.py       # Cloud configuration (Selectel, Timeweb)
+├── common.py             # SSH, Terraform, results I/O utilities
+├── metrics.py            # Base MetricConfig for optimization targets
+├── pricing.py            # Cloud pricing data and cost calculation
 └── pyproject.toml
 ```
 

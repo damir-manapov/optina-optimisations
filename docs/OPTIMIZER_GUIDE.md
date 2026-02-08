@@ -5,51 +5,130 @@ This document describes patterns and rules for writing Bayesian optimizers in th
 ## Architecture Overview
 
 ```
-optuna/
-├── common.py              # Shared utilities (SSH, Terraform, results I/O)
-├── {service}-optimizer/
-│   ├── optimizer.py       # Main optimizer script
-│   ├── benchmark.js       # k6 benchmark script (if HTTP-based)
-│   ├── study.db           # Optuna study database (per service)
-│   └── README.md          # Service-specific documentation
+optina-optimisations/
+├── argparse_helpers.py    # Common CLI argument definitions
+├── cloud_config.py        # Base CloudConfig + Selectel/Timeweb configs
+├── common.py              # SSH, Terraform, results I/O utilities
+├── metrics.py             # Base MetricConfig for optimization targets
+├── pricing.py             # Cloud pricing data and cost calculation
+├── optimizers/
+│   ├── {service}/
+│   │   ├── optimizer.py   # Main optimizer script
+│   │   ├── metrics.py     # Service-specific METRICS dict
+│   │   ├── cloud_config.py  # Re-exports or extends base CloudConfig
+│   │   ├── study.db       # Optuna study database (per service)
+│   │   └── README.md      # Service-specific documentation
+│   └── storage/           # Trial persistence (Pydantic models)
+│       ├── models.py      # Trial, InfraConfig, *Config, *Metrics
+│       └── store.py       # TrialStore for JSON persistence
 ```
 
-## Required Components
+## Shared Modules
 
-### Cloud Configuration
+### argparse_helpers.py
+
+Common CLI argument definitions. Use `add_common_arguments()` to add all standard arguments:
 
 ```python
+from argparse_helpers import add_common_arguments
+
+parser = argparse.ArgumentParser(description="Redis optimizer")
+add_common_arguments(
+    parser,
+    metrics=METRICS,
+    default_metric="ops_per_sec",
+    study_prefix="redis",
+    with_mode=True,           # Add --mode argument
+    with_fixed_host=True,     # Add --cpu, --ram for config mode
+)
+```
+
+This adds: `--cloud`, `--metric`, `--trials`, `--no-destroy`, `--show-results`, `--export-md`,
+and optionally `--mode`, `--cpu`, `--ram`, `--benchmark-vm-ip`, `--study-name`.
+
+### cloud_config.py
+
+Base cloud configuration shared by all optimizers:
+
+```python
+from cloud_config import CloudConfig, get_cloud_config, CLOUD_CONFIGS
+
+# Get config for a cloud
+config = get_cloud_config("selectel")
+print(config.terraform_dir)  # Path to terraform/selectel
+print(config.disk_types)     # ["fast", "universal2", ...]
+```
+
+Services can extend the base config (e.g., MinIO adds terraform resource names):
+
+```python
+# optimizers/minio/cloud_config.py
+from cloud_config import CloudConfig
+from dataclasses import dataclass
+
 @dataclass
-class CloudConfig:
-    name: str              # "selectel", "timeweb"
-    terraform_dir: Path    # Path to terraform directory
-    disk_types: list[str]  # Available disk types (from pricing.py)
-    cpu_cost: float        # Cost per vCPU per month (from common pricing)
-    ram_cost: float        # Cost per GB RAM per month
-    disk_cost_multipliers: dict[str, float]  # Per disk type
-
-def get_cloud_config(cloud: str) -> CloudConfig:
-    pricing = get_cloud_pricing(cloud)  # From pricing.py
-    return CloudConfig(
-        name=cloud,
-        terraform_dir=TERRAFORM_BASE / cloud,
-        disk_types=get_disk_types(cloud),  # Derived from pricing.py
-        cpu_cost=pricing.cpu_cost,
-        ram_cost=pricing.ram_cost,
-        disk_cost_multipliers=pricing.disk_cost_multipliers,
-    )
+class MinIOCloudConfig(CloudConfig):
+    compute_resource: str = ""
+    volume_resource: str = ""
 ```
 
-### Common Pricing
+### metrics.py
 
-Cloud pricing rates are defined in `pricing.py` and shared across all optimizers:
+Base `MetricConfig` class and `get_metric_value()` function:
 
 ```python
-from pricing import get_cloud_pricing, get_disk_types
-from pricing import get_cloud_pricing, CloudPricing
+from metrics import MetricConfig, Direction, get_metric_value
 
-# Returns CloudPricing(cpu_cost=655, ram_cost=238, disk_cost_multipliers={...})
+METRICS: dict[str, MetricConfig] = {
+    "ops_per_sec": MetricConfig(
+        name="ops_per_sec",
+        description="Operations per second",
+        direction=Direction.MAXIMIZE,
+        unit="ops/s",
+    ),
+    "cost_efficiency": MetricConfig(
+        name="cost_efficiency",
+        description="Ops per ruble",
+        direction=Direction.MAXIMIZE,
+        unit="ops/₽",
+        extractor=_calc_cost_efficiency,  # Custom extraction function
+    ),
+}
+
+# In objective function:
+metric_value = get_metric_value(result, metric, METRICS, cloud=cloud, config=config)
+```
+
+### pricing.py
+
+Cloud pricing and cost calculation:
+
+```python
+from pricing import (
+    get_cloud_pricing,
+    calculate_cost,
+    filter_valid_ram,
+    CostExtractorConfig,
+    make_cost_extractor,
+)
+
+# Get pricing
 pricing = get_cloud_pricing("selectel")
+
+# Calculate monthly cost
+cost = calculate_cost(config, "selectel")
+
+# Filter RAM options by CPU constraints
+valid_ram = filter_valid_ram("selectel", cpu=4, ram_options=[4, 8, 16, 32])
+
+# Create cost efficiency extractor
+_COST_CONFIG = CostExtractorConfig(
+    metric_key="throughput",
+    config_key="config",
+    cpu_key="cpu",
+    ram_key="ram_gb",
+)
+_calc_cost_efficiency = make_cost_extractor(_COST_CONFIG)
 ```
 
 | Cloud    | CPU (₽/vCPU/mo) | RAM (₽/GB/mo) | Disk (₽/GB/mo)                                                |
