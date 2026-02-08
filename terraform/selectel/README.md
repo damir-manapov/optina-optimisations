@@ -16,8 +16,11 @@ Terraform configuration for deploying benchmark infrastructure on [Selectel](htt
 export TF_VAR_selectel_domain="123456"
 export TF_VAR_selectel_username="your-username"
 export TF_VAR_selectel_password="your-password"
-export TF_VAR_selectel_openstack_password="your-openstack-password"
+# Generate a random password - Terraform will use it to create OpenStack credentials
+export TF_VAR_selectel_openstack_password="$(openssl rand -base64 24)"
 ```
+
+**Note:** `TF_VAR_selectel_openstack_password` is NOT an existing password. It's a new password you generate (any random string), which Terraform uses to create OpenStack user credentials for the project.
 
 2. Copy and edit the variables file:
 
