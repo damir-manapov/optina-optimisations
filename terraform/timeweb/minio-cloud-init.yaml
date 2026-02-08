@@ -1,0 +1,94 @@
+#cloud-config
+package_update: true
+
+packages:
+  - wget
+  - xfsprogs
+  - fio
+  - sysbench
+
+runcmd:
+  # Wait for disks to be attached
+  - sleep 30
+
+  # Add hostnames for MinIO cluster
+%{ for i in range(node_count) ~}
+  - echo '10.0.0.${10 + i} minio${i + 1}' >> /etc/hosts
+%{ endfor ~}
+
+  # Dynamically find and format data drives (non-boot disks > 50GB)
+  # This handles both vd* and sd* naming schemes
+  - |
+    DRIVE_NUM=1
+    for DISK in $(lsblk -dno NAME,SIZE,TYPE | awk '$3=="disk" && $1!~/^loop/ {print $1}'); do
+      # Skip the boot disk (has partitions with / mount)
+      if lsblk /dev/$DISK -o MOUNTPOINT | grep -q "^/$"; then
+        continue
+      fi
+      # Skip small disks (boot disk is usually ~50GB)
+      SIZE_GB=$(lsblk -dno SIZE /dev/$DISK | sed 's/G//')
+      if [ "$SIZE_GB" -lt 60 ] 2>/dev/null; then
+        continue
+      fi
+      # Format and mount this disk
+      mkdir -p /data$DRIVE_NUM
+      mkfs.xfs -f /dev/$DISK
+      mount /dev/$DISK /data$DRIVE_NUM
+      echo "/dev/$DISK /data$DRIVE_NUM xfs defaults,noatime 0 2" >> /etc/fstab
+      echo "Mounted /dev/$DISK as /data$DRIVE_NUM"
+      DRIVE_NUM=$((DRIVE_NUM + 1))
+      # Stop after expected number of drives
+      if [ $DRIVE_NUM -gt ${drives_per_node} ]; then
+        break
+      fi
+    done
+
+  # Install MinIO server and client
+  - wget -q https://dl.min.io/server/minio/release/linux-amd64/minio -O /usr/local/bin/minio
+  - wget -q https://dl.min.io/client/mc/release/linux-amd64/mc -O /usr/local/bin/mc
+  - chmod +x /usr/local/bin/minio /usr/local/bin/mc
+
+  # Create minio user and set ownership
+  - useradd -r -s /sbin/nologin minio-user
+  - chown -R minio-user:minio-user /data*
+
+  # Create MinIO environment file
+  - |
+    cat > /etc/default/minio << 'ENVFILE'
+    MINIO_ROOT_USER="${root_user}"
+    MINIO_ROOT_PASSWORD="${root_password}"
+    MINIO_VOLUMES="${volume_spec}"
+    MINIO_OPTS="--console-address :9001"
+    ENVFILE
+
+  # Create systemd service
+  - |
+    cat > /etc/systemd/system/minio.service << 'SERVICE'
+    [Unit]
+    Description=MinIO
+    Documentation=https://min.io/docs/minio
+    Wants=network-online.target
+    After=network-online.target
+
+    [Service]
+    User=minio-user
+    Group=minio-user
+    EnvironmentFile=/etc/default/minio
+    ExecStart=/usr/local/bin/minio server $MINIO_VOLUMES $MINIO_OPTS
+    Restart=always
+    RestartSec=5
+    LimitNOFILE=65536
+
+    [Install]
+    WantedBy=multi-user.target
+    SERVICE
+
+  # Start MinIO
+  - systemctl daemon-reload
+  - systemctl enable minio
+  - systemctl start minio
+
+  # Create ready marker
+  - touch /root/minio-ready
+
+final_message: "MinIO node ready after $UPTIME seconds"

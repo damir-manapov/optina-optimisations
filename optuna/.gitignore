@@ -1,0 +1,16 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+.ruff_cache/
+
+# Optuna database (generated)
+study.db
+
+# IDE
+.idea/
+.vscode/
+*.swp

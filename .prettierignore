@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+# Build outputs
+dist/
+
+# Lock files
+pnpm-lock.yaml
+uv.lock
+
+# Terraform
+terraform/**/.terraform/
+terraform/**/*-cloud-init.yaml
