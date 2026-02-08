@@ -13,30 +13,24 @@ from .models import (
 )
 from .store import TrialStore
 
-# Centralized results directory at project root
-RESULTS_DIR = Path(__file__).parent.parent / "results"
-
-
-def get_results_path(service: ServiceType) -> Path:
-    """Get path to results JSON file for a service."""
-    return RESULTS_DIR / f"{service}.json"
+# Centralized results file at project root
+RESULTS_FILE = Path(__file__).parent.parent / "results" / "results.json"
 
 
 def get_store(service: ServiceType) -> TrialStore:
     """Get TrialStore for a service."""
-    return TrialStore(get_results_path(service), service=service)
+    return TrialStore(RESULTS_FILE, service=service)
 
 
 __all__ = [
     "FioMetrics",
     "InfraConfig",
-    "RESULTS_DIR",
+    "RESULTS_FILE",
     "ServiceType",
     "SysbenchMetrics",
     "SystemBaseline",
     "Timings",
     "Trial",
     "TrialStore",
-    "get_results_path",
     "get_store",
 ]

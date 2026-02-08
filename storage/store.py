@@ -57,7 +57,7 @@ class TrialStore:
         return self._trials
 
     def _load(self) -> list[Trial]:
-        """Load trials from JSON file."""
+        """Load trials from JSON file, filtering by service."""
         if not self.path.exists():
             return []
 
@@ -67,8 +67,25 @@ class TrialStore:
         trials = []
         for item in data:
             trial = self._parse_trial(item)
-            if trial:
+            # Only load trials for this service
+            if trial and trial.service == self.service:
                 trials.append(trial)
+        return trials
+
+    def _load_all(self) -> list[Trial]:
+        """Load all trials from JSON file (all services)."""
+        if not self.path.exists():
+            return []
+
+        with open(self.path) as f:
+            data = json.load(f)
+
+        trials = []
+        for item in data:
+            try:
+                trials.append(Trial.model_validate(item))
+            except Exception:
+                pass
         return trials
 
     def _parse_trial(self, data: dict[str, Any]) -> Trial | None:
@@ -84,12 +101,19 @@ class TrialStore:
             return None
 
     def _save(self) -> None:
-        """Save trials to JSON file."""
+        """Save trials to JSON file, preserving other services' data."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Load all existing trials (all services)
+        all_trials = self._load_all()
+
+        # Remove old trials for this service, add current ones
+        other_trials = [t for t in all_trials if t.service != self.service]
+        combined = other_trials + self.trials
 
         # Use TypeAdapter for proper serialization
         adapter = TypeAdapter(list[Trial])
-        data = adapter.dump_python(self.trials, mode="json")
+        data = adapter.dump_python(combined, mode="json")
 
         with open(self.path, "w") as f:
             json.dump(data, f, indent=2, default=str)
