@@ -43,14 +43,12 @@ from common import (
 )
 
 from cloud_config import CloudConfig, get_cloud_config, get_config_space
-from metrics import MINIO_METRICS, Direction
+from metrics import Direction
+from optimizers.minio.metrics import METRICS
 from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
-
-# Available optimization metrics (from metrics.py)
-METRICS = {name: cfg.description for name, cfg in MINIO_METRICS.items()}
 
 
 def config_summary(r: dict) -> str:
@@ -220,7 +218,7 @@ def get_metric_value(result: dict, metric: str) -> float:
     Uses metric config to determine if value needs negation for minimization.
     """
     value = result.get(metric, 0)
-    metric_config = MINIO_METRICS.get(metric)
+    metric_config = METRICS.get(metric)
     if metric_config and metric_config.direction == Direction.MINIMIZE:
         return -value if value else float("inf")
     return value

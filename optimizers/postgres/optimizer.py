@@ -53,7 +53,8 @@ from cloud_config import (
     get_config_search_space,
     get_infra_search_space,
 )
-from metrics import POSTGRES_METRICS, Direction
+from metrics import Direction
+from optimizers.postgres.metrics import METRICS
 from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram
 
 RESULTS_DIR = Path(__file__).parent
@@ -69,10 +70,6 @@ class Mode(Enum):
     INFRA = "infra"  # Tune VM specs (CPU, RAM, disk)
     CONFIG = "config"  # Tune postgresql.conf (fixed host)
     FULL = "full"  # Both phases
-
-
-# Available optimization metrics (from metrics.py)
-METRICS = {name: cfg.description for name, cfg in POSTGRES_METRICS.items()}
 
 
 @dataclass
@@ -712,7 +709,7 @@ def get_metric_value(result: dict, metric: str) -> float:
     Uses metric config to determine if value needs negation for minimization.
     """
     value = result.get(metric, 0)
-    metric_config = POSTGRES_METRICS.get(metric)
+    metric_config = METRICS.get(metric)
     if metric_config and metric_config.direction == Direction.MINIMIZE:
         return -value if value else float("inf")
     return value

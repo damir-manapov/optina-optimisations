@@ -40,14 +40,12 @@ from common import (
 )
 
 from cloud_config import CloudConfig, get_cloud_config, get_config_space
-from metrics import REDIS_METRICS, Direction
+from metrics import Direction
+from optimizers.redis.metrics import METRICS
 from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
-
-# Available optimization metrics (from metrics.py)
-METRICS = {name: cfg.description for name, cfg in REDIS_METRICS.items()}
 
 
 def config_summary(r: dict) -> str:
@@ -647,7 +645,7 @@ def get_metric_value(result: dict, metric: str) -> float:
     Optuna always maximizes. Uses metric config to determine direction.
     """
     value = result.get(metric, 0)
-    metric_config = REDIS_METRICS.get(metric)
+    metric_config = METRICS.get(metric)
     if metric_config and metric_config.direction == Direction.MINIMIZE:
         return -value if value else float("inf")
     return value

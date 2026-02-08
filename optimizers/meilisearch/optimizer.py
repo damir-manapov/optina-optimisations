@@ -40,16 +40,14 @@ from common import (
     save_results,
     wait_for_vm_ready,
 )
-from metrics import MEILISEARCH_METRICS, Direction
+from metrics import Direction
+from optimizers.meilisearch.metrics import METRICS
 from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram, get_cloud_pricing
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
 BENCHMARK_SCRIPT = RESULTS_DIR / "benchmark.js"
 DATASET_SCRIPT = RESULTS_DIR / "dataset.py"
-
-# Available optimization metrics (from metrics.py)
-METRICS = {name: cfg.description for name, cfg in MEILISEARCH_METRICS.items()}
 
 # Meilisearch master key (must match terraform)
 MASTER_KEY = "benchmark-master-key-change-in-production"
@@ -561,7 +559,7 @@ def get_metric_value(result: dict, metric: str, cloud: str = "selectel") -> floa
         value = result.get(metric, 0)
 
     # Apply direction from metric config
-    metric_config = MEILISEARCH_METRICS.get(metric)
+    metric_config = METRICS.get(metric)
     if metric_config and metric_config.direction == Direction.MINIMIZE:
         return -value if value else float("inf")
     return value
