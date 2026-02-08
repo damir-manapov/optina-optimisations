@@ -27,7 +27,7 @@ services:
       retries: 5
 
   clickhouse:
-    image: clickhouse/clickhouse-server:25.12.1
+    image: clickhouse/clickhouse-server:25.12.5
     environment:
       CLICKHOUSE_USER: default
       CLICKHOUSE_PASSWORD: clickhouse
@@ -76,7 +76,7 @@ services:
       "
 
   nessie:
-    image: ghcr.io/projectnessie/nessie:0.106.0
+    image: ghcr.io/projectnessie/nessie:0.107.1
     ports:
       - "19120:19120"
     healthcheck:

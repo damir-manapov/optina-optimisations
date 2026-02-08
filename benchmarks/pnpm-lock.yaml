@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@clickhouse/client':
-        specifier: ^1.8.1
-        version: 1.15.0
+        specifier: ^1.17.0
+        version: 1.17.0
       '@mkven/name-dictionaries':
         specifier: ^0.1.0
         version: 0.1.0
@@ -18,8 +18,8 @@ importers:
         specifier: ^0.4.4
         version: 0.4.4
       postgres:
-        specifier: ^3.4.5
-        version: 3.4.7
+        specifier: ^3.4.8
+        version: 3.4.8
       trino-client:
         specifier: ^0.2.9
         version: 0.2.9
@@ -28,8 +28,8 @@ importers:
         specifier: ^2.3.14
         version: 2.3.14
       '@types/node':
-        specifier: ^25.0.3
-        version: 25.0.3
+        specifier: ^25.2.2
+        version: 25.2.2
       tsx:
         specifier: ^4.19.2
         version: 4.21.0
@@ -37,8 +37,8 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
       vitest:
-        specifier: ^4.0.16
-        version: 4.0.16(@types/node@25.0.3)(tsx@4.21.0)
+        specifier: ^4.0.18
+        version: 4.0.18(@types/node@25.2.2)(tsx@4.21.0)
 
 packages:
 
@@ -99,11 +99,11 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@clickhouse/client-common@1.15.0':
-    resolution: {integrity: sha512-/1BXaNNsBzH2w5ALWiH6M9zS+cJwlM9uMnMj9e8ETwvDjJzO+nIYlyxzp8Prc+9pEDZ5iAilZ4F8c0YVCzzNaA==}
+  '@clickhouse/client-common@1.17.0':
+    resolution: {integrity: sha512-MiwwgXViFAQA2YZkN4ymF1ynzG0K49KeSX9/iOcmJetWkxqSekDdpyp1GjwATWa9R215uQ+hGzJtJujeQVZZIw==}
 
-  '@clickhouse/client@1.15.0':
-    resolution: {integrity: sha512-QmW+p4c/r0oa3X6Un6lcBs4GZtJEQUdvf//x8GeqM5ru6m4oIUg3WwvermP3HE31kpEGoFOQfKbMN5ooR5gvNw==}
+  '@clickhouse/client@1.17.0':
+    resolution: {integrity: sha512-Y3DQoamKZ/Iyosoq7Lj7lqpDkQDK4R/5mI52yJs4ZLPIO+d6/CYDqTbFBIb4No3C/AlXUYE4TKhj/kXDpe6rOA==}
     engines: {node: '>=16'}
 
   '@esbuild/aix-ppc64@0.27.2':
@@ -405,14 +405,14 @@ packages:
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
-  '@types/node@25.0.3':
-    resolution: {integrity: sha512-W609buLVRVmeW693xKfzHeIV6nJGGz98uCPfeXI1ELMLXVeKYZ9m15fAMSaUPBHYLGFsVRcMmSCksQOrZV9BYA==}
+  '@types/node@25.2.2':
+    resolution: {integrity: sha512-BkmoP5/FhRYek5izySdkOneRyXYN35I860MFAGupTdebyE66uZaR+bXLHq8k4DirE5DwQi3NuhvRU1jqTVwUrQ==}
 
-  '@vitest/expect@4.0.16':
-    resolution: {integrity: sha512-eshqULT2It7McaJkQGLkPjPjNph+uevROGuIMJdG3V+0BSR2w9u6J9Lwu+E8cK5TETlfou8GRijhafIMhXsimA==}
+  '@vitest/expect@4.0.18':
+    resolution: {integrity: sha512-8sCWUyckXXYvx4opfzVY03EOiYVxyNrHS5QxX3DAIi5dpJAAkyJezHCP77VMX4HKA2LDT/Jpfo8i2r5BE3GnQQ==}
 
-  '@vitest/mocker@4.0.16':
-    resolution: {integrity: sha512-yb6k4AZxJTB+q9ycAvsoxGn+j/po0UaPgajllBgt1PzoMAAmJGYFdDk0uCcRcxb3BrME34I6u8gHZTQlkqSZpg==}
+  '@vitest/mocker@4.0.18':
+    resolution: {integrity: sha512-HhVd0MDnzzsgevnOWCBj5Otnzobjy5wLBe4EdeeFGv8luMsGcYqDuFRMcttKWZA5vVO8RFjexVovXvAM4JoJDQ==}
     peerDependencies:
       msw: ^2.4.9
       vite: ^6.0.0 || ^7.0.0-0
@@ -422,20 +422,20 @@ packages:
       vite:
         optional: true
 
-  '@vitest/pretty-format@4.0.16':
-    resolution: {integrity: sha512-eNCYNsSty9xJKi/UdVD8Ou16alu7AYiS2fCPRs0b1OdhJiV89buAXQLpTbe+X8V9L6qrs9CqyvU7OaAopJYPsA==}
+  '@vitest/pretty-format@4.0.18':
+    resolution: {integrity: sha512-P24GK3GulZWC5tz87ux0m8OADrQIUVDPIjjj65vBXYG17ZeU3qD7r+MNZ1RNv4l8CGU2vtTRqixrOi9fYk/yKw==}
 
-  '@vitest/runner@4.0.16':
-    resolution: {integrity: sha512-VWEDm5Wv9xEo80ctjORcTQRJ539EGPB3Pb9ApvVRAY1U/WkHXmmYISqU5E79uCwcW7xYUV38gwZD+RV755fu3Q==}
+  '@vitest/runner@4.0.18':
+    resolution: {integrity: sha512-rpk9y12PGa22Jg6g5M3UVVnTS7+zycIGk9ZNGN+m6tZHKQb7jrP7/77WfZy13Y/EUDd52NDsLRQhYKtv7XfPQw==}
 
-  '@vitest/snapshot@4.0.16':
-    resolution: {integrity: sha512-sf6NcrYhYBsSYefxnry+DR8n3UV4xWZwWxYbCJUt2YdvtqzSPR7VfGrY0zsv090DAbjFZsi7ZaMi1KnSRyK1XA==}
+  '@vitest/snapshot@4.0.18':
+    resolution: {integrity: sha512-PCiV0rcl7jKQjbgYqjtakly6T1uwv/5BQ9SwBLekVg/EaYeQFPiXcgrC2Y7vDMA8dM1SUEAEV82kgSQIlXNMvA==}
 
-  '@vitest/spy@4.0.16':
-    resolution: {integrity: sha512-4jIOWjKP0ZUaEmJm00E0cOBLU+5WE0BpeNr3XN6TEF05ltro6NJqHWxXD0kA8/Zc8Nh23AT8WQxwNG+WeROupw==}
+  '@vitest/spy@4.0.18':
+    resolution: {integrity: sha512-cbQt3PTSD7P2OARdVW3qWER5EGq7PHlvE+QfzSC0lbwO+xnt7+XH06ZzFjFRgzUX//JmpxrCu92VdwvEPlWSNw==}
 
-  '@vitest/utils@4.0.16':
-    resolution: {integrity: sha512-h8z9yYhV3e1LEfaQ3zdypIrnAg/9hguReGZoS7Gl0aBG5xgA410zBqECqmaF/+RkTggRsfnzc1XaAHA6bmUufA==}
+  '@vitest/utils@4.0.18':
+    resolution: {integrity: sha512-msMRKLMVLWygpK3u2Hybgi4MNjcYJvwTb0Ru09+fOyCXIgT5raYP041DRRdiJiI3k/2U6SEbAETB3YtBrUkCFA==}
 
   assertion-error@2.0.1:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
@@ -672,8 +672,8 @@ packages:
     resolution: {integrity: sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg==}
     engines: {node: ^10 || ^12 || >=14}
 
-  postgres@3.4.7:
-    resolution: {integrity: sha512-Jtc2612XINuBjIl/QTWsV5UvE8UHuNblcO3vVADSrKsrc6RqGX6lOW1cEo3CM2v0XG4Nat8nI+YM7/f26VxXLw==}
+  postgres@3.4.8:
+    resolution: {integrity: sha512-d+JFcLM17njZaOLkv6SCev7uoLaBtfK86vMUXhW1Z4glPWh4jozno9APvW/XKFJ3CCxVoC7OL38BqRydtu5nGg==}
     engines: {node: '>=12'}
 
   prebuild-install@7.1.3:
@@ -821,18 +821,18 @@ packages:
       yaml:
         optional: true
 
-  vitest@4.0.16:
-    resolution: {integrity: sha512-E4t7DJ9pESL6E3I8nFjPa4xGUd3PmiWDLsDztS2qXSJWfHtbQnwAWylaBvSNY48I3vr8PTqIZlyK8TE3V3CA4Q==}
+  vitest@4.0.18:
+    resolution: {integrity: sha512-hOQuK7h0FGKgBAas7v0mSAsnvrIgAvWmRFjmzpJ7SwFHH3g1k2u37JtYwOwmEKhK6ZO3v9ggDBBm0La1LCK4uQ==}
     engines: {node: ^20.0.0 || ^22.0.0 || >=24.0.0}
     hasBin: true
     peerDependencies:
       '@edge-runtime/vm': '*'
       '@opentelemetry/api': ^1.9.0
       '@types/node': ^20.0.0 || ^22.0.0 || >=24.0.0
-      '@vitest/browser-playwright': 4.0.16
-      '@vitest/browser-preview': 4.0.16
-      '@vitest/browser-webdriverio': 4.0.16
-      '@vitest/ui': 4.0.16
+      '@vitest/browser-playwright': 4.0.18
+      '@vitest/browser-preview': 4.0.18
+      '@vitest/browser-webdriverio': 4.0.18
+      '@vitest/ui': 4.0.18
       happy-dom: '*'
       jsdom: '*'
     peerDependenciesMeta:
@@ -900,11 +900,11 @@ snapshots:
   '@biomejs/cli-win32-x64@2.3.14':
     optional: true
 
-  '@clickhouse/client-common@1.15.0': {}
+  '@clickhouse/client-common@1.17.0': {}
 
-  '@clickhouse/client@1.15.0':
+  '@clickhouse/client@1.17.0':
     dependencies:
-      '@clickhouse/client-common': 1.15.0
+      '@clickhouse/client-common': 1.17.0
 
   '@esbuild/aix-ppc64@0.27.2':
     optional: true
@@ -990,11 +990,11 @@ snapshots:
 
   '@mkven/samples-generation@0.4.4':
     dependencies:
-      '@clickhouse/client': 1.15.0
+      '@clickhouse/client': 1.17.0
       '@mkven/name-dictionaries': 0.1.0
       better-sqlite3: 12.5.0
       pg-format: 1.0.4
-      postgres: 3.4.7
+      postgres: 3.4.8
       trino-client: 0.2.9
     transitivePeerDependencies:
       - debug
@@ -1076,47 +1076,47 @@ snapshots:
 
   '@types/estree@1.0.8': {}
 
-  '@types/node@25.0.3':
+  '@types/node@25.2.2':
     dependencies:
       undici-types: 7.16.0
 
-  '@vitest/expect@4.0.16':
+  '@vitest/expect@4.0.18':
     dependencies:
       '@standard-schema/spec': 1.1.0
       '@types/chai': 5.2.3
-      '@vitest/spy': 4.0.16
-      '@vitest/utils': 4.0.16
+      '@vitest/spy': 4.0.18
+      '@vitest/utils': 4.0.18
       chai: 6.2.2
       tinyrainbow: 3.0.3
 
-  '@vitest/mocker@4.0.16(vite@7.3.0(@types/node@25.0.3)(tsx@4.21.0))':
+  '@vitest/mocker@4.0.18(vite@7.3.0(@types/node@25.2.2)(tsx@4.21.0))':
     dependencies:
-      '@vitest/spy': 4.0.16
+      '@vitest/spy': 4.0.18
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 7.3.0(@types/node@25.0.3)(tsx@4.21.0)
+      vite: 7.3.0(@types/node@25.2.2)(tsx@4.21.0)
 
-  '@vitest/pretty-format@4.0.16':
+  '@vitest/pretty-format@4.0.18':
     dependencies:
       tinyrainbow: 3.0.3
 
-  '@vitest/runner@4.0.16':
+  '@vitest/runner@4.0.18':
     dependencies:
-      '@vitest/utils': 4.0.16
+      '@vitest/utils': 4.0.18
       pathe: 2.0.3
 
-  '@vitest/snapshot@4.0.16':
+  '@vitest/snapshot@4.0.18':
     dependencies:
-      '@vitest/pretty-format': 4.0.16
+      '@vitest/pretty-format': 4.0.18
       magic-string: 0.30.21
       pathe: 2.0.3
 
-  '@vitest/spy@4.0.16': {}
+  '@vitest/spy@4.0.18': {}
 
-  '@vitest/utils@4.0.16':
+  '@vitest/utils@4.0.18':
     dependencies:
-      '@vitest/pretty-format': 4.0.16
+      '@vitest/pretty-format': 4.0.18
       tinyrainbow: 3.0.3
 
   assertion-error@2.0.1: {}
@@ -1351,7 +1351,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  postgres@3.4.7: {}
+  postgres@3.4.8: {}
 
   prebuild-install@7.1.3:
     dependencies:
@@ -1493,7 +1493,7 @@ snapshots:
 
   util-deprecate@1.0.2: {}
 
-  vite@7.3.0(@types/node@25.0.3)(tsx@4.21.0):
+  vite@7.3.0(@types/node@25.2.2)(tsx@4.21.0):
     dependencies:
       esbuild: 0.27.2
       fdir: 6.5.0(picomatch@4.0.3)
@@ -1502,19 +1502,19 @@ snapshots:
       rollup: 4.54.0
       tinyglobby: 0.2.15
     optionalDependencies:
-      '@types/node': 25.0.3
+      '@types/node': 25.2.2
       fsevents: 2.3.3
       tsx: 4.21.0
 
-  vitest@4.0.16(@types/node@25.0.3)(tsx@4.21.0):
+  vitest@4.0.18(@types/node@25.2.2)(tsx@4.21.0):
     dependencies:
-      '@vitest/expect': 4.0.16
-      '@vitest/mocker': 4.0.16(vite@7.3.0(@types/node@25.0.3)(tsx@4.21.0))
-      '@vitest/pretty-format': 4.0.16
-      '@vitest/runner': 4.0.16
-      '@vitest/snapshot': 4.0.16
-      '@vitest/spy': 4.0.16
-      '@vitest/utils': 4.0.16
+      '@vitest/expect': 4.0.18
+      '@vitest/mocker': 4.0.18(vite@7.3.0(@types/node@25.2.2)(tsx@4.21.0))
+      '@vitest/pretty-format': 4.0.18
+      '@vitest/runner': 4.0.18
+      '@vitest/snapshot': 4.0.18
+      '@vitest/spy': 4.0.18
+      '@vitest/utils': 4.0.18
       es-module-lexer: 1.7.0
       expect-type: 1.3.0
       magic-string: 0.30.21
@@ -1526,10 +1526,10 @@ snapshots:
       tinyexec: 1.0.2
       tinyglobby: 0.2.15
       tinyrainbow: 3.0.3
-      vite: 7.3.0(@types/node@25.0.3)(tsx@4.21.0)
+      vite: 7.3.0(@types/node@25.2.2)(tsx@4.21.0)
       why-is-node-running: 2.3.0
     optionalDependencies:
-      '@types/node': 25.0.3
+      '@types/node': 25.2.2
     transitivePeerDependencies:
       - jiti
       - less
