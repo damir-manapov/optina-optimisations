@@ -40,6 +40,7 @@ from common import (
     save_results,
     wait_for_vm_ready,
 )
+from metrics import MEILISEARCH_METRICS, Direction
 from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram, get_cloud_pricing
 
 RESULTS_DIR = Path(__file__).parent
@@ -47,12 +48,8 @@ STUDY_DB = RESULTS_DIR / "study.db"
 BENCHMARK_SCRIPT = RESULTS_DIR / "benchmark.js"
 DATASET_SCRIPT = RESULTS_DIR / "dataset.py"
 
-# Available optimization metrics
-METRICS = {
-    "qps": "Queries per second (higher is better)",
-    "p95_ms": "95th percentile latency in ms (lower is better)",
-    "cost_efficiency": "QPS per ₽/mo (higher is better)",
-}
+# Available optimization metrics (from metrics.py)
+METRICS = {name: cfg.description for name, cfg in MEILISEARCH_METRICS.items()}
 
 # Meilisearch master key (must match terraform)
 MASTER_KEY = "benchmark-master-key-change-in-production"
@@ -548,18 +545,26 @@ def get_metric_value(result: dict, metric: str, cloud: str = "selectel") -> floa
     """Extract the optimization metric value from a result.
 
     For cost_efficiency, calculates QPS/cost on-the-fly from infra config.
+    Uses metric config to determine if value needs negation for minimization.
     """
-    if metric == "qps":
-        return result.get("qps", 0)
-    elif metric == "cost_efficiency":
+    # Handle special case: cost_efficiency is calculated on-the-fly
+    if metric == "cost_efficiency":
         qps = result.get("qps", 0)
         infra = result.get("infra", {})
         cost = calculate_cost(infra, cloud)
         return qps / cost if cost > 0 else 0
-    elif metric == "indexing_time":
-        return result.get("indexing_time_s", float("inf"))
-    else:  # p95_ms default
-        return result.get("p95_ms", float("inf"))
+
+    # Get raw value
+    if metric == "indexing_time":
+        value = result.get("indexing_time_s", 0)
+    else:
+        value = result.get(metric, 0)
+
+    # Apply direction from metric config
+    metric_config = MEILISEARCH_METRICS.get(metric)
+    if metric_config and metric_config.direction == Direction.MINIMIZE:
+        return -value if value else float("inf")
+    return value
 
 
 def save_result(

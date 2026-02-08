@@ -53,6 +53,7 @@ from cloud_config import (
     get_config_search_space,
     get_infra_search_space,
 )
+from metrics import POSTGRES_METRICS, Direction
 from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram
 
 RESULTS_DIR = Path(__file__).parent
@@ -70,12 +71,8 @@ class Mode(Enum):
     FULL = "full"  # Both phases
 
 
-# Available optimization metrics
-METRICS = {
-    "tps": "Transactions per second (higher is better)",
-    "latency_avg_ms": "Average latency in ms (lower is better)",
-    "cost_efficiency": "TPS per $/hr (higher is better)",
-}
+# Available optimization metrics (from metrics.py)
+METRICS = {name: cfg.description for name, cfg in POSTGRES_METRICS.items()}
 
 
 @dataclass
@@ -710,11 +707,15 @@ def save_result(
 
 
 def get_metric_value(result: dict, metric: str) -> float:
-    """Extract the optimization metric value from a result."""
-    if metric == "latency_avg_ms":
-        # For latency, we want to minimize, so return negative
-        return -result.get("latency_avg_ms", float("inf"))
-    return result.get(metric, 0)
+    """Extract the optimization metric value from a result.
+
+    Uses metric config to determine if value needs negation for minimization.
+    """
+    value = result.get(metric, 0)
+    metric_config = POSTGRES_METRICS.get(metric)
+    if metric_config and metric_config.direction == Direction.MINIMIZE:
+        return -value if value else float("inf")
+    return value
 
 
 def infra_summary(c: dict) -> str:
