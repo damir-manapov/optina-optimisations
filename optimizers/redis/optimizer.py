@@ -40,7 +40,7 @@ from common import (
 )
 
 from cloud_config import CloudConfig, get_cloud_config, get_config_space
-from metrics import Direction
+from metrics import get_metric_value
 from optimizers.redis.metrics import METRICS
 from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram
 
@@ -368,7 +368,7 @@ def load_historical_trials(study: optuna.Study, cloud: str, metric: str) -> int:
         }
 
         # Calculate metric value
-        value = get_metric_value(result, metric)
+        value = get_metric_value(result, metric, METRICS)
 
         # Create and add trial
         try:
@@ -638,19 +638,6 @@ def save_result(
     export_results_md(cloud)
 
 
-def get_metric_value(result: dict, metric: str) -> float:
-    """Extract the optimization metric value from a result.
-
-    For metrics that need minimization, returns negative value since
-    Optuna always maximizes. Uses metric config to determine direction.
-    """
-    value = result.get(metric, 0)
-    metric_config = METRICS.get(metric)
-    if metric_config and metric_config.direction == Direction.MINIMIZE:
-        return -value if value else float("inf")
-    return value
-
-
 def objective(
     trial: optuna.Trial,
     cloud: str,
@@ -692,7 +679,7 @@ def objective(
     # Check cache
     cached = find_cached_result(config, cloud)
     if cached:
-        cached_value = get_metric_value(cached, metric)
+        cached_value = get_metric_value(cached, metric, METRICS)
         print(f"  Using cached result: {cached_value:.2f} ({metric})")
         return cached_value
 
@@ -731,7 +718,7 @@ def objective(
         "cost_efficiency": result.ops_per_sec / cost if cost > 0 else 0,
     }
 
-    metric_value = get_metric_value(result_metrics, metric)
+    metric_value = get_metric_value(result_metrics, metric, METRICS)
 
     print(
         f"  Result: {result.ops_per_sec:.0f} ops/s, p99={result.p99_latency_ms:.2f}ms, Cost: {cost:.2f}/hr"

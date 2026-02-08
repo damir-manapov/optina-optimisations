@@ -53,7 +53,7 @@ from cloud_config import (
     get_config_search_space,
     get_infra_search_space,
 )
-from metrics import Direction
+from metrics import get_metric_value
 from optimizers.postgres.metrics import METRICS
 from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram
 
@@ -257,7 +257,7 @@ def load_historical_trials(
             continue
 
         # Calculate metric value
-        value = get_metric_value(result, metric)
+        value = get_metric_value(result, metric, METRICS)
 
         # Create and add trial
         try:
@@ -703,18 +703,6 @@ def save_result(
     export_results_md(cloud)
 
 
-def get_metric_value(result: dict, metric: str) -> float:
-    """Extract the optimization metric value from a result.
-
-    Uses metric config to determine if value needs negation for minimization.
-    """
-    value = result.get(metric, 0)
-    metric_config = METRICS.get(metric)
-    if metric_config and metric_config.direction == Direction.MINIMIZE:
-        return -value if value else float("inf")
-    return value
-
-
 def infra_summary(c: dict) -> str:
     """Format infra config as compact string."""
     return f"{c.get('cpu', 0)}cpu/{c.get('ram_gb', 0)}gb/{c.get('disk_type', '?')}"
@@ -923,7 +911,7 @@ def objective_infra(
     # Check cache
     cached = find_cached_result(infra_config, pg_config, cloud)
     if cached:
-        cached_value = get_metric_value(cached, metric)
+        cached_value = get_metric_value(cached, metric, METRICS)
         print(f"  Using cached result: {cached_value:.2f} ({metric})")
         return cached_value
 
@@ -987,6 +975,7 @@ def objective_infra(
             "cost_efficiency": result.tps / calculate_cost(infra_config, cloud),
         },
         metric,
+        METRICS,
     )
 
 
@@ -1049,7 +1038,7 @@ def objective_config(
     # Check cache
     cached = find_cached_result(infra_config, pg_config, cloud)
     if cached:
-        cached_value = get_metric_value(cached, metric)
+        cached_value = get_metric_value(cached, metric, METRICS)
         print(f"  Using cached result: {cached_value:.2f} ({metric})")
         return cached_value
 
@@ -1091,6 +1080,7 @@ def objective_config(
             "cost_efficiency": result.tps / calculate_cost(infra_config, cloud),
         },
         metric,
+        METRICS,
     )
 
 

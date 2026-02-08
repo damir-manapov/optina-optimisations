@@ -33,3 +33,26 @@ class MetricConfig:
     def format_value(self, value: float) -> str:
         """Format value with unit."""
         return f"{value:{self.format_spec}} {self.unit}"
+
+
+def get_metric_value(
+    result: dict, metric: str, metrics: dict[str, MetricConfig]
+) -> float:
+    """Extract the optimization metric value from a result.
+
+    For metrics that need minimization, returns negative value since
+    Optuna always maximizes. Uses metric config to determine direction.
+
+    Args:
+        result: Dict containing metric values
+        metric: Name of the metric to extract
+        metrics: Service-specific METRICS dict
+
+    Returns:
+        Metric value (negated if direction is MINIMIZE)
+    """
+    value = result.get(metric, 0)
+    metric_config = metrics.get(metric)
+    if metric_config and metric_config.direction == Direction.MINIMIZE:
+        return -value if value else float("inf")
+    return value

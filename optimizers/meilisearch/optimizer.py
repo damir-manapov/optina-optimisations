@@ -40,7 +40,7 @@ from common import (
     save_results,
     wait_for_vm_ready,
 )
-from metrics import Direction
+from metrics import get_metric_value as _base_get_metric_value
 from optimizers.meilisearch.metrics import METRICS
 from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram, get_cloud_pricing
 
@@ -542,8 +542,7 @@ def find_cached_result(infra: dict, meili_config: dict, cloud: str) -> dict | No
 def get_metric_value(result: dict, metric: str, cloud: str = "selectel") -> float:
     """Extract the optimization metric value from a result.
 
-    For cost_efficiency, calculates QPS/cost on-the-fly from infra config.
-    Uses metric config to determine if value needs negation for minimization.
+    Handles special cases for Meilisearch, then delegates to base function.
     """
     # Handle special case: cost_efficiency is calculated on-the-fly
     if metric == "cost_efficiency":
@@ -552,17 +551,11 @@ def get_metric_value(result: dict, metric: str, cloud: str = "selectel") -> floa
         cost = calculate_cost(infra, cloud)
         return qps / cost if cost > 0 else 0
 
-    # Get raw value
+    # Handle special case: indexing_time uses different key
     if metric == "indexing_time":
-        value = result.get("indexing_time_s", 0)
-    else:
-        value = result.get(metric, 0)
+        result = {**result, "indexing_time": result.get("indexing_time_s", 0)}
 
-    # Apply direction from metric config
-    metric_config = METRICS.get(metric)
-    if metric_config and metric_config.direction == Direction.MINIMIZE:
-        return -value if value else float("inf")
-    return value
+    return _base_get_metric_value(result, metric, METRICS)
 
 
 def save_result(

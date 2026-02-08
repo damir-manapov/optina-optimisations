@@ -2,7 +2,7 @@
 
 import pytest
 
-from metrics import Direction, MetricConfig
+from metrics import Direction, MetricConfig, get_metric_value
 
 
 class TestDirection:
@@ -158,3 +158,73 @@ class TestServiceMetrics:
                 assert isinstance(config.direction, Direction), (
                     f"{service}.{name}: invalid direction"
                 )
+
+
+class TestGetMetricValue:
+    """Tests for get_metric_value function."""
+
+    def test_maximize_metric_returns_value(self) -> None:
+        """Maximize metrics should return value as-is."""
+        metrics = {
+            "ops_per_sec": MetricConfig(
+                name="ops_per_sec",
+                description="Ops",
+                direction=Direction.MAXIMIZE,
+                unit="ops/s",
+            )
+        }
+        result = {"ops_per_sec": 1000.0}
+        assert get_metric_value(result, "ops_per_sec", metrics) == 1000.0
+
+    def test_minimize_metric_returns_negative(self) -> None:
+        """Minimize metrics should return negated value for Optuna."""
+        metrics = {
+            "latency_ms": MetricConfig(
+                name="latency_ms",
+                description="Latency",
+                direction=Direction.MINIMIZE,
+                unit="ms",
+            )
+        }
+        result = {"latency_ms": 5.0}
+        assert get_metric_value(result, "latency_ms", metrics) == -5.0
+
+    def test_minimize_zero_returns_inf(self) -> None:
+        """Minimize metric with zero value should return infinity."""
+        metrics = {
+            "latency_ms": MetricConfig(
+                name="latency_ms",
+                description="Latency",
+                direction=Direction.MINIMIZE,
+                unit="ms",
+            )
+        }
+        result = {"latency_ms": 0}
+        assert get_metric_value(result, "latency_ms", metrics) == float("inf")
+
+    def test_missing_metric_returns_zero(self) -> None:
+        """Missing metric in result should return 0."""
+        metrics = {
+            "ops_per_sec": MetricConfig(
+                name="ops_per_sec",
+                description="Ops",
+                direction=Direction.MAXIMIZE,
+                unit="ops/s",
+            )
+        }
+        result = {}
+        assert get_metric_value(result, "ops_per_sec", metrics) == 0
+
+    def test_unknown_metric_returns_zero(self) -> None:
+        """Unknown metric (not in metrics dict) should return value as-is."""
+        metrics: dict[str, MetricConfig] = {}
+        result = {"unknown": 100.0}
+        assert get_metric_value(result, "unknown", metrics) == 100.0
+
+    def test_with_real_redis_metrics(self) -> None:
+        """Test with actual Redis metrics."""
+        from optimizers.redis.metrics import METRICS
+
+        result = {"ops_per_sec": 50000, "p99_latency_ms": 2.5}
+        assert get_metric_value(result, "ops_per_sec", METRICS) == 50000
+        assert get_metric_value(result, "p99_latency_ms", METRICS) == -2.5
