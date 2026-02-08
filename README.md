@@ -38,6 +38,10 @@ This project automates finding optimal configurations for various products on cl
 - [gitleaks](https://github.com/gitleaks/gitleaks) - secrets scanning
 - [jq](https://jqlang.github.io/jq/) - JSON processing
 
+**Required for Terraform checks:**
+- [tflint](https://github.com/terraform-linters/tflint) - Terraform linter
+- [trivy](https://github.com/aquasecurity/trivy) - security scanner
+
 ### Installation
 
 ```bash
@@ -56,6 +60,17 @@ sudo apt update && sudo apt install -y terraform
 GITLEAKS_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r .tag_name)
 wget https://github.com/gitleaks/gitleaks/releases/download/${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION#v}_linux_x64.tar.gz
 tar -xzf gitleaks_*.tar.gz gitleaks && sudo mv gitleaks /usr/local/bin/ && rm gitleaks_*.tar.gz
+
+# tflint
+TFLINT_VERSION=$(curl -s https://api.github.com/repos/terraform-linters/tflint/releases/latest | jq -r .tag_name)
+wget https://github.com/terraform-linters/tflint/releases/download/${TFLINT_VERSION}/tflint_linux_amd64.zip
+unzip tflint_linux_amd64.zip && sudo mv tflint /usr/local/bin/ && rm tflint_linux_amd64.zip
+
+# trivy
+sudo apt install -y apt-transport-https gnupg
+wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
+echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee /etc/apt/sources.list.d/trivy.list
+sudo apt update && sudo apt install -y trivy
 ```
 
 ### Setup

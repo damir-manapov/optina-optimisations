@@ -16,20 +16,20 @@ fi
 
 echo ""
 echo "=== TFLint (Linting & Best Practices) ==="
-if command -v tflint &> /dev/null; then
-    tflint --init
-    tflint --recursive
-else
-    echo "tflint not installed, skipping (install: brew install tflint)"
+if ! command -v tflint &> /dev/null; then
+    echo "tflint not installed. See README.md for installation instructions."
+    exit 1
 fi
+tflint --init
+tflint --recursive
 
 echo ""
 echo "=== Trivy (Security Misconfigurations) ==="
-if command -v trivy &> /dev/null; then
-    trivy config --severity HIGH,CRITICAL .
-else
-    echo "trivy not installed, skipping (install: brew install trivy)"
+if ! command -v trivy &> /dev/null; then
+    echo "trivy not installed. See README.md for installation instructions."
+    exit 1
 fi
+trivy config --severity HIGH,CRITICAL .
 
 echo ""
 echo "=== Terraform Check Passed ==="

@@ -3,7 +3,7 @@ set -e
 
 echo "=== Checking for secrets with gitleaks ==="
 if ! command -v gitleaks &> /dev/null; then
-  echo "gitleaks not installed. Install with: brew install gitleaks"
+  echo "gitleaks not installed. See README.md for installation instructions."
   exit 1
 fi
 gitleaks detect --source . -v
