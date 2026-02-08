@@ -31,6 +31,7 @@ from optuna.samplers import TPESampler
 # Add root dir to path for common imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from cloud_config import CloudConfig, get_cloud_config
 from common import (
     destroy_all,
     get_terraform,
@@ -42,7 +43,7 @@ from common import (
 )
 from metrics import get_metric_value
 from optimizers.meilisearch.metrics import METRICS
-from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram, get_cloud_pricing
+from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
@@ -57,43 +58,6 @@ DISK_SIZE_GB = 100
 
 # Dataset config
 DATASET_SIZE = 500000  # 500K products
-
-TERRAFORM_BASE = Path(__file__).parent.parent.parent / "terraform"
-
-
-@dataclass
-class CloudConfig:
-    name: str
-    terraform_dir: Path
-    cpu_cost: float  # Cost per vCPU per month
-    ram_cost: float  # Cost per GB RAM per month
-    disk_cost_multipliers: dict[str, float]
-
-
-def _make_cloud_config(name: str) -> CloudConfig:
-    """Create CloudConfig using common pricing."""
-    pricing = get_cloud_pricing(name)
-    return CloudConfig(
-        name=name,
-        terraform_dir=TERRAFORM_BASE / name,
-        cpu_cost=pricing.cpu_cost,
-        ram_cost=pricing.ram_cost,
-        disk_cost_multipliers=pricing.disk_cost_multipliers,
-    )
-
-
-CLOUD_CONFIGS: dict[str, CloudConfig] = {
-    "selectel": _make_cloud_config("selectel"),
-    "timeweb": _make_cloud_config("timeweb"),
-}
-
-
-def get_cloud_config(cloud: str) -> CloudConfig:
-    if cloud not in CLOUD_CONFIGS:
-        raise ValueError(
-            f"Unknown cloud: {cloud}. Available: {list(CLOUD_CONFIGS.keys())}"
-        )
-    return CLOUD_CONFIGS[cloud]
 
 
 def calculate_cost(infra_config: dict, cloud: str) -> float:

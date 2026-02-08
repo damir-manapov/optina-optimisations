@@ -42,7 +42,11 @@ from common import (
     wait_for_vm_ready,
 )
 
-from cloud_config import CloudConfig, get_cloud_config, get_config_space
+from optimizers.minio.cloud_config import (
+    CloudConfig,
+    get_cloud_config,
+    get_config_space,
+)
 from metrics import get_metric_value
 from optimizers.minio.metrics import METRICS
 from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram

@@ -47,7 +47,7 @@ from common import (
     wait_for_vm_ready,
 )
 
-from cloud_config import (
+from optimizers.postgres.cloud_config import (
     CloudConfig,
     get_cloud_config,
     get_config_search_space,

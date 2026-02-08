@@ -150,3 +150,131 @@ class TestCostCalculation:
         disk_diff = triple_disk - single_disk
         expected_diff = 50 * 39 * 2  # 2 extra disks
         assert disk_diff == pytest.approx(expected_diff, rel=0.01)
+
+
+class TestCostExtractorConfig:
+    """Tests for CostExtractorConfig and make_cost_extractor."""
+
+    def test_basic_extractor(self) -> None:
+        from pricing import CostExtractorConfig, make_cost_extractor
+
+        config = CostExtractorConfig(
+            metric_key="tps",
+            config_key="config",
+            cpu_key="cpu",
+            ram_key="ram_gb",
+        )
+        extractor = make_cost_extractor(config)
+        result = {
+            "tps": 1000,
+            "config": {"cpu": 2, "ram_gb": 4},
+        }
+        efficiency = extractor(result, "selectel")
+        assert efficiency > 0
+
+    def test_extractor_with_disk_config(self) -> None:
+        from pricing import CostExtractorConfig, make_cost_extractor
+
+        config = CostExtractorConfig(
+            metric_key="qps",
+            config_key="infra",
+            cpu_key="cpu",
+            ram_key="ram_gb",
+            disk_size_key="disk_size_gb",
+            disk_type_key="disk_type",
+        )
+        extractor = make_cost_extractor(config)
+        result = {
+            "qps": 500,
+            "infra": {"cpu": 4, "ram_gb": 8, "disk_size_gb": 100, "disk_type": "fast"},
+        }
+        efficiency = extractor(result, "selectel")
+        assert efficiency > 0
+
+    def test_extractor_with_nodes(self) -> None:
+        from pricing import CostExtractorConfig, make_cost_extractor
+
+        config = CostExtractorConfig(
+            metric_key="ops",
+            config_key="config",
+            cpu_key="cpu",
+            ram_key="ram_gb",
+            nodes_key="nodes",
+        )
+        extractor = make_cost_extractor(config)
+        result_1node = {"ops": 1000, "config": {"cpu": 2, "ram_gb": 4, "nodes": 1}}
+        result_3nodes = {"ops": 1000, "config": {"cpu": 2, "ram_gb": 4, "nodes": 3}}
+
+        eff_1 = extractor(result_1node, "selectel")
+        eff_3 = extractor(result_3nodes, "selectel")
+        # 3 nodes = 3x cost = 1/3 efficiency for same metric
+        assert eff_3 == pytest.approx(eff_1 / 3, rel=0.01)
+
+    def test_extractor_with_drives_per_node(self) -> None:
+        from pricing import CostExtractorConfig, make_cost_extractor
+
+        config = CostExtractorConfig(
+            metric_key="throughput",
+            config_key="config",
+            cpu_key="cpu",
+            ram_key="ram_gb",
+            drives_per_node_key="drives",
+        )
+        extractor = make_cost_extractor(config)
+        result_1drive = {
+            "throughput": 100,
+            "config": {"cpu": 2, "ram_gb": 4, "drives": 1},
+        }
+        result_4drives = {
+            "throughput": 100,
+            "config": {"cpu": 2, "ram_gb": 4, "drives": 4},
+        }
+
+        eff_1 = extractor(result_1drive, "selectel")
+        eff_4 = extractor(result_4drives, "selectel")
+        # More drives = higher cost = lower efficiency
+        assert eff_4 < eff_1
+
+    def test_extractor_missing_metric_returns_zero(self) -> None:
+        from pricing import CostExtractorConfig, make_cost_extractor
+
+        config = CostExtractorConfig(
+            metric_key="tps",
+            config_key="config",
+            cpu_key="cpu",
+            ram_key="ram_gb",
+        )
+        extractor = make_cost_extractor(config)
+        result = {"config": {"cpu": 2, "ram_gb": 4}}  # No tps
+        assert extractor(result, "selectel") == 0
+
+    def test_extractor_missing_config_returns_zero(self) -> None:
+        from pricing import CostExtractorConfig, make_cost_extractor
+
+        config = CostExtractorConfig(
+            metric_key="tps",
+            config_key="config",
+            cpu_key="cpu",
+            ram_key="ram_gb",
+        )
+        extractor = make_cost_extractor(config)
+        result = {"tps": 1000}  # No config
+        assert extractor(result, "selectel") == 0
+
+    def test_extractor_uses_defaults(self) -> None:
+        from pricing import CostExtractorConfig, make_cost_extractor
+
+        config = CostExtractorConfig(
+            metric_key="ops",
+            config_key="config",
+            cpu_key="cpu",
+            ram_key="ram_gb",
+            default_disk_size=100,
+            default_disk_type="universal",
+            nodes_default=2,
+        )
+        extractor = make_cost_extractor(config)
+        result = {"ops": 1000, "config": {"cpu": 2, "ram_gb": 4}}
+        efficiency = extractor(result, "selectel")
+        # Should use defaults and return non-zero
+        assert efficiency > 0

@@ -1,33 +1,25 @@
-"""Cloud provider configurations for the optimizer."""
+"""Cloud provider configurations for the MinIO optimizer."""
 
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from pricing import get_cloud_pricing, get_disk_types
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from cloud_config import CloudConfig as BaseCloudConfig
+from cloud_config import make_cloud_config
 
 
 @dataclass
-class CloudConfig:
-    """Configuration for a cloud provider."""
+class MinIOCloudConfig(BaseCloudConfig):
+    """Extended configuration for MinIO with terraform resource names."""
 
-    name: str
-    terraform_dir: Path
-    disk_types: list[str]
     # Terraform resource names for tainting
-    instance_resource: str
-    boot_volume_resource: str | None
-    data_volume_resource: str
-    network_port_resource: str | None
-    # Cost factors (from common pricing)
-    cpu_cost: float
-    ram_cost: float
-    disk_cost_multipliers: dict[str, float]
+    instance_resource: str = ""
+    boot_volume_resource: str | None = None
+    data_volume_resource: str = ""
+    network_port_resource: str | None = None
 
-
-# Base path for terraform configs
-TERRAFORM_BASE = Path(__file__).parent.parent.parent / "terraform"
 
 # Terraform resource mappings per cloud
 _TERRAFORM_RESOURCES = {
@@ -46,27 +38,30 @@ _TERRAFORM_RESOURCES = {
 }
 
 
-def _make_config(name: str) -> CloudConfig:
-    """Create CloudConfig using common pricing."""
-    pricing = get_cloud_pricing(name)
+def _make_minio_config(name: str) -> MinIOCloudConfig:
+    """Create MinIOCloudConfig with terraform resources."""
+    base = make_cloud_config(name)
     resources = _TERRAFORM_RESOURCES[name]
-    return CloudConfig(
-        name=name,
-        terraform_dir=TERRAFORM_BASE / name,
-        disk_types=get_disk_types(name),
+    return MinIOCloudConfig(
+        name=base.name,
+        terraform_dir=base.terraform_dir,
+        disk_types=base.disk_types,
+        cpu_cost=base.cpu_cost,
+        ram_cost=base.ram_cost,
+        disk_cost_multipliers=base.disk_cost_multipliers,
         instance_resource=resources["instance_resource"],
         boot_volume_resource=resources["boot_volume_resource"],
         data_volume_resource=resources["data_volume_resource"],
         network_port_resource=resources["network_port_resource"],
-        cpu_cost=pricing.cpu_cost,
-        ram_cost=pricing.ram_cost,
-        disk_cost_multipliers=pricing.disk_cost_multipliers,
     )
 
 
-CLOUD_CONFIGS: dict[str, CloudConfig] = {
-    "selectel": _make_config("selectel"),
-    "timeweb": _make_config("timeweb"),
+# Alias for compatibility
+CloudConfig = MinIOCloudConfig
+
+CLOUD_CONFIGS: dict[str, MinIOCloudConfig] = {
+    "selectel": _make_minio_config("selectel"),
+    "timeweb": _make_minio_config("timeweb"),
 }
 
 

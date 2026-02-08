@@ -4,7 +4,9 @@ Centralized pricing rates for all optimizers.
 Update this file when cloud provider prices change.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -160,3 +162,94 @@ def calculate_vm_cost(
         disk_cost += disk.size_gb * disk.count * multiplier
 
     return nodes * (cpu_cost + ram_cost + disk_cost)
+
+
+# ============================================================================
+# Cost Efficiency Extractor Factory
+# ============================================================================
+
+
+@dataclass(frozen=True)
+class CostExtractorConfig:
+    """Configuration for creating a cost efficiency extractor.
+
+    This allows declarative definition of how to extract cost efficiency
+    from benchmark results, handling the variations between services.
+    """
+
+    metric_key: str  # Key for primary metric in result (ops_per_sec, tps, qps, etc.)
+    config_key: str  # Key for config dict in result (config, infra_config, infra)
+    cpu_key: str = "cpu"  # Key for CPU in config
+    ram_key: str = "ram_gb"  # Key for RAM in config
+    disk_size_key: str | None = None  # Key for disk size (None = use default)
+    disk_type_key: str | None = None  # Key for disk type (None = use default)
+    default_disk_size: int = 50
+    default_disk_type: str = "fast"
+    nodes_key: str | None = None  # Key for nodes count (None = use nodes_func)
+    nodes_default: int = 1  # Default node count if no key/func
+    # For services with complex node logic (e.g., Redis mode-based)
+    drives_per_node_key: str | None = None  # For MinIO multi-drive setups
+
+
+def make_cost_extractor(
+    config: CostExtractorConfig,
+) -> Callable[[dict[str, Any], str], float]:
+    """Create a cost efficiency extractor function from config.
+
+    The returned function has signature: (result: dict, cloud: str) -> float
+    """
+
+    def extractor(result: dict[str, Any], cloud: str = "selectel") -> float:
+        # Get primary metric value
+        metric_value = result.get(config.metric_key, 0)
+        if not metric_value:
+            return 0
+
+        # Get config dict
+        cfg = result.get(config.config_key, {})
+        if not cfg:
+            return 0
+
+        # Extract CPU and RAM
+        cpu = cfg.get(config.cpu_key, 0)
+        ram_gb = cfg.get(config.ram_key, 0)
+
+        # Extract disk config
+        disk_size = (
+            cfg.get(config.disk_size_key, config.default_disk_size)
+            if config.disk_size_key
+            else config.default_disk_size
+        )
+        disk_type = (
+            cfg.get(config.disk_type_key, config.default_disk_type)
+            if config.disk_type_key
+            else config.default_disk_type
+        )
+
+        # Handle drives per node (MinIO)
+        drives_count = (
+            cfg.get(config.drives_per_node_key, 1) if config.drives_per_node_key else 1
+        )
+
+        # Build disk list
+        disks = [DiskConfig(size_gb=disk_size, disk_type=disk_type, count=drives_count)]
+
+        # Get node count
+        nodes = (
+            cfg.get(config.nodes_key, config.nodes_default)
+            if config.nodes_key
+            else config.nodes_default
+        )
+
+        # Calculate cost
+        cost = calculate_vm_cost(
+            cloud=cloud,
+            cpu=cpu,
+            ram_gb=ram_gb,
+            disks=disks,
+            nodes=nodes,
+        )
+
+        return metric_value / cost if cost > 0 else 0
+
+    return extractor
