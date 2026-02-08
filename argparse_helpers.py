@@ -46,6 +46,26 @@ def add_cloud_argument(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def add_login_argument(parser: argparse.ArgumentParser) -> None:
+    """Add --login/-l argument to parser.
+
+    Adds required login/username for tracking who ran the trial.
+
+    Example:
+        >>> parser = argparse.ArgumentParser()
+        >>> add_login_argument(parser)
+        >>> args = parser.parse_args(["--login", "damir"])
+        >>> args.login
+        'damir'
+    """
+    parser.add_argument(
+        "--login",
+        "-l",
+        required=True,
+        help="Your login/username for tracking trial ownership",
+    )
+
+
 def add_metric_argument(
     parser: argparse.ArgumentParser,
     choices: list[str],
@@ -329,6 +349,7 @@ def add_common_arguments(
         - ``--export-md``: Export results to markdown and exit
     """
     add_cloud_argument(parser)
+    add_login_argument(parser)
     add_metric_argument(parser, list(metrics.keys()), default_metric)
     add_trials_argument(parser, default_trials)
 

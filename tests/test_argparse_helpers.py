@@ -233,8 +233,9 @@ class TestCommonArguments:
         parser = argparse.ArgumentParser()
         metrics = {"tps": None, "latency": None}
         add_common_arguments(parser, metrics=metrics, default_metric="tps")
-        args = parser.parse_args(["--cloud", "selectel"])
+        args = parser.parse_args(["--cloud", "selectel", "--login", "testuser"])
         assert args.cloud == "selectel"
+        assert args.login == "testuser"
         assert args.metric == "tps"
         assert args.trials == 10
         assert args.no_destroy is False
@@ -247,7 +248,7 @@ class TestCommonArguments:
         add_common_arguments(
             parser, metrics=metrics, default_metric="tps", with_mode=True
         )
-        args = parser.parse_args(["--cloud", "selectel"])
+        args = parser.parse_args(["--cloud", "selectel", "--login", "testuser"])
         assert args.mode == "config"
 
     def test_with_fixed_host(self) -> None:
@@ -261,7 +262,7 @@ class TestCommonArguments:
             cpu_default=8,
             ram_default=16,
         )
-        args = parser.parse_args(["--cloud", "selectel"])
+        args = parser.parse_args(["--cloud", "selectel", "--login", "testuser"])
         assert args.cpu == 8
         assert args.ram == 16
 
@@ -271,7 +272,7 @@ class TestCommonArguments:
         add_common_arguments(
             parser, metrics=metrics, default_metric="tps", study_prefix="redis"
         )
-        args = parser.parse_args(["--cloud", "selectel"])
+        args = parser.parse_args(["--cloud", "selectel", "--login", "testuser"])
         assert args.study_name is None
 
     def test_without_benchmark_vm(self) -> None:
@@ -280,7 +281,7 @@ class TestCommonArguments:
         add_common_arguments(
             parser, metrics=metrics, default_metric="tps", with_benchmark_vm=False
         )
-        args = parser.parse_args(["--cloud", "selectel"])
+        args = parser.parse_args(["--cloud", "selectel", "--login", "testuser"])
         assert not hasattr(args, "benchmark_vm_ip")
 
     def test_full_configuration(self) -> None:
@@ -303,6 +304,8 @@ class TestCommonArguments:
             [
                 "--cloud",
                 "timeweb",
+                "--login",
+                "testuser",
                 "--metric",
                 "cost_efficiency",
                 "--trials",
@@ -322,6 +325,7 @@ class TestCommonArguments:
             ]
         )
         assert args.cloud == "timeweb"
+        assert args.login == "testuser"
         assert args.metric == "cost_efficiency"
         assert args.trials == 50
         assert args.mode == "full"

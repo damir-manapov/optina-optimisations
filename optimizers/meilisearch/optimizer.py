@@ -504,6 +504,7 @@ def save_result(
     trial_num: int,
     cloud: str,
     cloud_config: CloudConfig,
+    login: str,
     indexing_time: float = 0,
 ):
     """Save benchmark result."""
@@ -526,6 +527,7 @@ def save_result(
             "trial": trial_num,
             "timestamp": datetime.now().isoformat(),
             "cloud": cloud,
+            "login": login,
             "infra": infra_config,
             "config": meili_config,
             "qps": result.qps,
@@ -858,6 +860,7 @@ def objective_infra(
     trial: optuna.Trial,
     cloud: str,
     cloud_config: CloudConfig,
+    login: str,
     metric: str = "p95_ms",
 ) -> float:
     """Objective function for infrastructure optimization."""
@@ -941,6 +944,7 @@ def objective_infra(
         trial.number,
         cloud,
         cloud_config,
+        login,
         indexing_time,
     )
 
@@ -964,6 +968,7 @@ def objective_config(
     benchmark_ip: str,
     meili_ip: str,
     infra_config: dict,
+    login: str,
     metric: str = "p95_ms",
 ) -> float:
     """Objective function for config optimization."""
@@ -1039,6 +1044,7 @@ curl -sf -X DELETE 'http://{meili_ip}:7700/indexes/products' \\
         trial.number,
         cloud,
         cloud_config,
+        login,
         indexing_time,
     )
 
@@ -1116,7 +1122,7 @@ def main() -> None:
 
             study.optimize(
                 lambda trial: objective_infra(
-                    trial, args.cloud, cloud_config, args.metric
+                    trial, args.cloud, cloud_config, args.login, args.metric
                 ),
                 n_trials=args.trials,
                 catch=(optuna.TrialPruned,),
@@ -1155,6 +1161,7 @@ def main() -> None:
                     benchmark_ip,
                     meili_ip,
                     infra_config,
+                    args.login,
                     args.metric,
                 ),
                 n_trials=args.trials,

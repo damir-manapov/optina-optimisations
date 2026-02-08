@@ -656,6 +656,7 @@ def save_result(
     cloud: str,
     mode: str,
     cloud_config: CloudConfig,
+    login: str,
 ) -> None:
     """Save benchmark result to JSON file."""
     store = get_store()
@@ -676,6 +677,7 @@ def save_result(
             "trial": trial_number,
             "timestamp": datetime.now().isoformat(),
             "cloud": cloud,
+            "login": login,
             "mode": mode,
             "infra_config": infra_config,
             "pg_config": pg_config,
@@ -857,6 +859,7 @@ def objective_infra(
     trial: optuna.Trial,
     cloud: str,
     cloud_config: CloudConfig,
+    login: str,
     metric: str = "tps",
 ) -> float:
     """Objective function for infrastructure optimization."""
@@ -956,7 +959,7 @@ def objective_infra(
 
     # Save result
     save_result(
-        result, infra_config, pg_config, trial.number, cloud, "infra", cloud_config
+        result, infra_config, pg_config, trial.number, cloud, "infra", cloud_config, login
     )
 
     return get_metric_value(
@@ -977,6 +980,7 @@ def objective_config(
     benchmark_ip: str,
     postgres_ip: str,
     infra_config: dict,
+    login: str,
     metric: str = "tps",
 ) -> float:
     """Objective function for Postgres config optimization (fixed host)."""
@@ -1061,7 +1065,7 @@ def objective_config(
 
     # Save result
     save_result(
-        result, infra_config, pg_config, trial.number, cloud, "config", cloud_config
+        result, infra_config, pg_config, trial.number, cloud, "config", cloud_config, login
     )
 
     return get_metric_value(
@@ -1144,7 +1148,7 @@ Examples:
 
             study.optimize(
                 lambda trial: objective_infra(
-                    trial, args.cloud, cloud_config, args.metric
+                    trial, args.cloud, cloud_config, args.login, args.metric
                 ),
                 n_trials=args.trials,
                 catch=(optuna.TrialPruned,),
@@ -1193,6 +1197,7 @@ Examples:
                     benchmark_ip,
                     postgres_ip,
                     infra_config,
+                    args.login,
                     args.metric,
                 ),
                 n_trials=args.trials,

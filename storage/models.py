@@ -112,6 +112,7 @@ class Trial(BaseModel):
     )
     service: ServiceType = Field(description="Service being benchmarked")
     cloud: str = Field(description="Cloud provider (e.g., 'selectel')")
+    login: str | None = Field(default=None, description="User who ran the trial")
 
     # Infrastructure - each service uses different field names
     # Meilisearch uses "infra", PostgreSQL uses "infra_config"

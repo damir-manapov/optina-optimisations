@@ -936,6 +936,7 @@ def save_result(
     trial_number: int,
     cloud: str,
     cloud_config: CloudConfig,
+    login: str,
 ) -> None:
     """Save benchmark result to JSON file."""
     store = get_store()
@@ -982,6 +983,7 @@ def save_result(
             "trial": trial_number,
             "timestamp": datetime.now().isoformat(),
             "cloud": cloud,
+            "login": login,
             "config": config,
             "total_drives": total_drives,
             "total_mib_s": result.total_mib_s,
@@ -1003,6 +1005,7 @@ def objective(
     cloud: str,
     cloud_config: CloudConfig,
     vm_ip: str,
+    login: str,
     metric: str = "total_mib_s",
 ) -> float:
     """Optuna objective function."""
@@ -1065,6 +1068,7 @@ def objective(
             trial.number,
             cloud,
             cloud_config,
+            login,
         )
         return 0.0
 
@@ -1091,6 +1095,7 @@ def objective(
             trial.number,
             cloud,
             cloud_config,
+            login,
         )
         return 0.0
 
@@ -1102,7 +1107,7 @@ def objective(
     result.config = config
     result.baseline = baseline
     result.timings = timings
-    save_result(result, config, trial.number, cloud, cloud_config)
+    save_result(result, config, trial.number, cloud, cloud_config, login)
 
     cost = calculate_cost(config, cloud)
     cost_efficiency = result.total_mib_s / cost if cost > 0 else 0
@@ -1225,7 +1230,7 @@ Examples:
         # Run optimization
         study.optimize(
             lambda trial: objective(
-                trial, args.cloud, cloud_config, vm_ip, args.metric
+                trial, args.cloud, cloud_config, vm_ip, args.login, args.metric
             ),
             n_trials=args.trials,
             show_progress_bar=True,
