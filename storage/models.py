@@ -98,30 +98,16 @@ class SystemBaseline(BaseModel):
 ServiceType = Literal["meilisearch", "redis", "postgres", "minio"]
 
 
-class Trial(BaseModel):
-    """A single benchmark trial result.
+# ============================================================================
+# Metrics
+# ============================================================================
 
-    Supports all four service types with their specific config/metrics formats.
+
+class Metrics(BaseModel):
+    """Performance metrics from benchmark runs.
+
+    All fields are optional since each service uses different metrics.
     """
-
-    # Core fields
-    id: int | None = Field(default=None, description="Auto-assigned trial ID")
-    trial: int | None = Field(default=None, description="Trial number from optimizer")
-    timestamp: datetime | str = Field(
-        default_factory=datetime.now, description="When the trial was run"
-    )
-    service: ServiceType = Field(description="Service being benchmarked")
-    cloud: str = Field(description="Cloud provider (e.g., 'selectel')")
-    login: str | None = Field(default=None, description="User who ran the trial")
-
-    # Infrastructure - each service uses different field names
-    # Meilisearch uses "infra", PostgreSQL uses "infra_config"
-    infra: InfraConfig | None = Field(default=None, description="Infra (Meilisearch)")
-    infra_config: InfraConfig | None = Field(default=None, description="Infra (PostgreSQL)")
-
-    # Service configuration - varies per service, stored as dict
-    config: dict[str, Any] | None = Field(default=None, description="Redis/MinIO/Meilisearch config")
-    pg_config: dict[str, Any] | None = Field(default=None, description="PostgreSQL config")
 
     # Redis metrics
     ops_per_sec: float | None = Field(default=None, ge=0)
@@ -150,8 +136,39 @@ class Trial(BaseModel):
     get_mib_s: float | None = Field(default=None, ge=0)
     put_mib_s: float | None = Field(default=None, ge=0)
 
-    # Common fields
+    # Common
     duration_s: float | None = Field(default=None, ge=0)
+
+
+class Trial(BaseModel):
+    """A single benchmark trial result.
+
+    Supports all four service types with their specific config/metrics formats.
+    """
+
+    # Core fields
+    id: int | None = Field(default=None, description="Auto-assigned trial ID")
+    trial: int | None = Field(default=None, description="Trial number from optimizer")
+    timestamp: datetime | str = Field(
+        default_factory=datetime.now, description="When the trial was run"
+    )
+    service: ServiceType = Field(description="Service being benchmarked")
+    cloud: str = Field(description="Cloud provider (e.g., 'selectel')")
+    login: str | None = Field(default=None, description="User who ran the trial")
+
+    # Infrastructure - each service uses different field names
+    # Meilisearch uses "infra", PostgreSQL uses "infra_config"
+    infra: InfraConfig | None = Field(default=None, description="Infra (Meilisearch)")
+    infra_config: InfraConfig | None = Field(default=None, description="Infra (PostgreSQL)")
+
+    # Service configuration - varies per service, stored as dict
+    config: dict[str, Any] | None = Field(default=None, description="Redis/MinIO/Meilisearch config")
+    pg_config: dict[str, Any] | None = Field(default=None, description="PostgreSQL config")
+
+    # Metrics - nested under metrics field
+    metrics: Metrics | None = Field(default=None, description="Performance metrics")
+
+    # Common fields
     nodes: int | None = Field(default=None, ge=1)
     total_drives: int | None = Field(default=None, ge=1)
     mode: str | None = Field(default=None, description="Optimization mode (PostgreSQL)")
@@ -167,26 +184,30 @@ class Trial(BaseModel):
         """Check if trial completed successfully."""
         if self.error is not None:
             return False
+        m = self.metrics
         if self.service == "redis":
-            return (self.ops_per_sec or 0) > 0
+            return m is not None and (m.ops_per_sec or 0) > 0
         if self.service == "meilisearch":
-            return (self.qps or 0) > 0
+            return m is not None and (m.qps or 0) > 0
         if self.service == "postgres":
-            return (self.tps or 0) > 0
+            return m is not None and (m.tps or 0) > 0
         if self.service == "minio":
-            return (self.total_mib_s or 0) > 0
+            return m is not None and (m.total_mib_s or 0) > 0
         return False
 
     def get_primary_metric(self) -> float:
         """Get the primary performance metric for this service."""
+        m = self.metrics
+        if m is None:
+            return 0
         if self.service == "redis":
-            return self.ops_per_sec or 0
+            return m.ops_per_sec or 0
         if self.service == "meilisearch":
-            return self.qps or 0
+            return m.qps or 0
         if self.service == "postgres":
-            return self.tps or 0
+            return m.tps or 0
         if self.service == "minio":
-            return self.total_mib_s or 0
+            return m.total_mib_s or 0
         return 0
 
     def get_config_key(self) -> dict[str, Any]:

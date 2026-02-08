@@ -34,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from cloud_config import CloudConfig, get_cloud_config
 from common import (
     destroy_all,
+    get_metric,
     get_terraform,
     get_tf_output,
     run_ssh_command,
@@ -492,7 +493,8 @@ def find_cached_result(infra: dict, meili_config: dict, cloud: str) -> dict | No
         return None
     if trial.error:
         return None
-    if (trial.qps or 0) <= 0:
+    qps = trial.metrics.qps if trial.metrics else 0
+    if (qps or 0) <= 0:
         return None
     return trial.model_dump()
 
@@ -530,12 +532,14 @@ def save_result(
             "login": login,
             "infra": infra_config,
             "config": meili_config,
-            "qps": result.qps,
-            "p50_ms": result.p50_ms,
-            "p95_ms": result.p95_ms,
-            "p99_ms": result.p99_ms,
-            "error_rate": result.error_rate,
-            "indexing_time_s": indexing_time,
+            "metrics": {
+                "qps": result.qps,
+                "p50_ms": result.p50_ms,
+                "p95_ms": result.p95_ms,
+                "p99_ms": result.p99_ms,
+                "error_rate": result.error_rate,
+                "indexing_time_s": indexing_time,
+            },
             "error": result.error,
             "timings": timings_dict,
         }
@@ -570,7 +574,7 @@ def format_results(cloud: str) -> dict | None:
     if not results:
         return None
 
-    results_sorted = sorted(results, key=lambda x: x.get("qps", 0), reverse=True)
+    results_sorted = sorted(results, key=lambda x: get_metric(x, "qps"), reverse=True)
 
     rows = []
     for r in results_sorted:
@@ -578,7 +582,7 @@ def format_results(cloud: str) -> dict | None:
         cfg = r.get("config", {})
         # Calculate cost on-the-fly from infra config
         cost = calculate_cost(infra, cloud)
-        qps = r.get("qps", 0)
+        qps = get_metric(r, "qps")
         eff = qps / cost if cost > 0 else 0
         rows.append(
             {
@@ -588,10 +592,10 @@ def format_results(cloud: str) -> dict | None:
                 "mem_mb": cfg.get("max_indexing_memory_mb", 0),
                 "threads": cfg.get("max_indexing_threads", 0),
                 "qps": qps,
-                "p50": r.get("p50_ms", 0),
-                "p95": r.get("p95_ms", 0),
-                "p99": r.get("p99_ms", 0),
-                "idx_time": r.get("indexing_time_s", 0),
+                "p50": get_metric(r, "p50_ms"),
+                "p95": get_metric(r, "p95_ms"),
+                "p99": get_metric(r, "p99_ms"),
+                "idx_time": get_metric(r, "indexing_time_s"),
                 "cost": cost,
                 "eff": eff,
                 "_result": r,  # Keep reference for best calculation
@@ -752,7 +756,7 @@ def load_historical_trials(
         for r in results
         if r.get("cloud") == cloud
         and not r.get("error")
-        and r.get("qps", 0) > 0
+        and get_metric(r, "qps") > 0
         and r.get("infra", {}).get("cpu")
     ]
 

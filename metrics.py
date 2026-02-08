@@ -51,11 +51,18 @@ class MetricConfig:
         """Extract raw metric value from result dict.
 
         Uses extractor if provided, otherwise looks up result_key or name.
+        Supports both nested metrics dict and top-level keys (legacy).
         """
         if self.extractor is not None:
             return self.extractor(result, **kwargs)
         key = self.result_key or self.name
-        return result.get(key, 0)
+        # Check nested metrics dict first, fallback to top-level for legacy
+        metrics = result.get("metrics", {})
+        if metrics and key in metrics:
+            val = metrics.get(key, 0)
+            return val if val is not None else 0
+        val = result.get(key, 0)
+        return val if val is not None else 0
 
 
 def get_metric_value(

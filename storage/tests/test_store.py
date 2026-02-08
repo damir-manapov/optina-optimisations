@@ -37,12 +37,14 @@ def sample_redis_dict() -> dict:
             "persistence": "none",
         },
         "nodes": 1,
-        "ops_per_sec": 150000,
-        "avg_latency_ms": 0.5,
-        "p50_latency_ms": 0.4,
-        "p99_latency_ms": 1.2,
-        "p999_latency_ms": 2.5,
-        "kb_per_sec": 12000,
+        "metrics": {
+            "ops_per_sec": 150000,
+            "avg_latency_ms": 0.5,
+            "p50_latency_ms": 0.4,
+            "p99_latency_ms": 1.2,
+            "p999_latency_ms": 2.5,
+            "kb_per_sec": 12000,
+        },
         "duration_s": 60,
         "timings": {
             "redis_deploy_s": 120,
@@ -61,12 +63,14 @@ def sample_meilisearch_dict() -> dict:
         "cloud": "selectel",
         "infra": {"cpu": 4, "ram_gb": 8, "disk_type": "fast", "disk_size_gb": 100},
         "config": {"max_indexing_memory_mb": 1024, "max_indexing_threads": 4},
-        "qps": 3000,
-        "p50_ms": 30,
-        "p95_ms": 40,
-        "p99_ms": 50,
-        "error_rate": 0.01,
-        "indexing_time_s": 15,
+        "metrics": {
+            "qps": 3000,
+            "p50_ms": 30,
+            "p95_ms": 40,
+            "p99_ms": 50,
+            "error_rate": 0.01,
+            "indexing_time_s": 15,
+        },
         "timings": {
             "terraform_s": 120,
             "meili_ready_s": 30,
@@ -92,7 +96,8 @@ class TestTrialStore:
         assert trial.id == 1
         assert trial.service == "redis"
         assert trial.cloud == "selectel"
-        assert trial.ops_per_sec == 150000
+        assert trial.metrics is not None
+        assert trial.metrics.ops_per_sec == 150000
         assert redis_store.count() == 1
         assert redis_store.path.exists()
 
@@ -102,7 +107,8 @@ class TestTrialStore:
 
         sample2 = sample_redis_dict.copy()
         sample2["trial"] = 2
-        sample2["ops_per_sec"] = 160000
+        sample2["metrics"] = sample_redis_dict["metrics"].copy()
+        sample2["metrics"]["ops_per_sec"] = 160000
         t2 = redis_store.add_dict(sample2)
 
         assert t1.id == 1
@@ -121,7 +127,8 @@ class TestTrialStore:
         assert store2.count() == 1
         assert store2.trials[0].id == 1
         assert store2.trials[0].service == "redis"
-        assert store2.trials[0].ops_per_sec == 150000
+        assert store2.trials[0].metrics is not None
+        assert store2.trials[0].metrics.ops_per_sec == 150000
 
     def test_reload(self, redis_store: TrialStore, sample_redis_dict: dict):
         """Reload should refresh from disk."""
@@ -200,7 +207,8 @@ class TestTrialStoreFindByConfigKey:
 
         result = redis_store.find_by_config_key(config_key)
         assert result is not None
-        assert result.ops_per_sec == 150000
+        assert result.metrics is not None
+        assert result.metrics.ops_per_sec == 150000
 
     def test_no_match(self, redis_store: TrialStore, sample_redis_dict: dict):
         """Should return None when no matching config."""
@@ -232,7 +240,8 @@ class TestTrialStoreGetById:
 
         result = redis_store.get_by_id(1)
         assert result is not None
-        assert result.ops_per_sec == 150000
+        assert result.metrics is not None
+        assert result.metrics.ops_per_sec == 150000
 
     def test_get_nonexistent(self, redis_store: TrialStore):
         """Should return None for non-existent ID."""
@@ -249,7 +258,8 @@ class TestTrialModels:
         trial = Trial.model_validate(sample_redis_dict)
 
         assert trial.service == "redis"
-        assert trial.ops_per_sec == 150000
+        assert trial.metrics is not None
+        assert trial.metrics.ops_per_sec == 150000
         assert trial.config is not None
         assert trial.config["mode"] == "single"
         assert trial.is_successful()
@@ -260,7 +270,8 @@ class TestTrialModels:
         trial = Trial.model_validate(sample_meilisearch_dict)
 
         assert trial.service == "meilisearch"
-        assert trial.qps == 3000
+        assert trial.metrics is not None
+        assert trial.metrics.qps == 3000
         assert trial.infra is not None
         assert trial.infra.cpu == 4
         assert trial.is_successful()
@@ -269,7 +280,7 @@ class TestTrialModels:
         """Failed trial should not be successful."""
         sample_redis_dict["service"] = "redis"
         sample_redis_dict["error"] = "Connection refused"
-        sample_redis_dict["ops_per_sec"] = 0
+        sample_redis_dict["metrics"]["ops_per_sec"] = 0
 
         trial = Trial.model_validate(sample_redis_dict)
         assert not trial.is_successful()
@@ -296,7 +307,7 @@ class TestTrialStoreAsDicts:
 
         dicts = redis_store.as_dicts()
         assert len(dicts) == 1
-        assert dicts[0]["ops_per_sec"] == 150000
+        assert dicts[0]["metrics"]["ops_per_sec"] == 150000
         assert dicts[0]["service"] == "redis"
 
 

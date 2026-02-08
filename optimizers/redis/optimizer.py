@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from common import (
     clear_known_hosts_on_vm,
     destroy_all,
+    get_metric,
     get_terraform,
     get_tf_output,
     run_ssh_command,
@@ -72,7 +73,7 @@ def format_results(cloud: str) -> dict | None:
         return None
 
     results_sorted = sorted(
-        results, key=lambda x: x.get("ops_per_sec", 0), reverse=True
+        results, key=lambda x: get_metric(x, "ops_per_sec"), reverse=True
     )
 
     # Extract row data
@@ -83,7 +84,7 @@ def format_results(cloud: str) -> dict | None:
         cloud_name = r.get("cloud", cloud)
         # Calculate cost on-the-fly from config
         cost = calculate_cost(cfg, cloud_name)
-        ops = r.get("ops_per_sec", 0)
+        ops = get_metric(r, "ops_per_sec")
         eff = ops / cost if cost > 0 else 0
         rows.append(
             {
@@ -95,7 +96,7 @@ def format_results(cloud: str) -> dict | None:
                 "io": cfg.get("io_threads", 0),
                 "persist": cfg.get("persistence", "?"),
                 "ops": ops,
-                "p99": r.get("p99_latency_ms", 0),
+                "p99": get_metric(r, "p99_latency_ms"),
                 "cost": cost,
                 "eff": eff,
                 "_result": r,  # Keep reference for best calculation
@@ -273,7 +274,8 @@ def find_cached_result(config: dict, cloud: str) -> dict | None:
         return None
     if trial.error:
         return None
-    if (trial.ops_per_sec or 0) <= 0:
+    ops = trial.metrics.ops_per_sec if trial.metrics else 0
+    if (ops or 0) <= 0:
         return None
     return trial.model_dump()
 
@@ -294,7 +296,7 @@ def load_historical_trials(study: optuna.Study, cloud: str, metric: str) -> int:
         for r in store.as_dicts()
         if r.get("cloud") == cloud
         and not r.get("error")
-        and r.get("ops_per_sec", 0) > 0
+        and get_metric(r, "ops_per_sec") > 0
         and r.get("config", {}).get("cpu_per_node")
     ]
 
@@ -631,13 +633,15 @@ def save_result(
             "login": login,
             "config": config,
             "nodes": 1 if config["mode"] == "single" else 3,
-            "ops_per_sec": result.ops_per_sec,
-            "avg_latency_ms": result.avg_latency_ms,
-            "p50_latency_ms": result.p50_latency_ms,
-            "p99_latency_ms": result.p99_latency_ms,
-            "p999_latency_ms": result.p999_latency_ms,
-            "kb_per_sec": result.kb_per_sec,
-            "duration_s": result.duration_s,
+            "metrics": {
+                "ops_per_sec": result.ops_per_sec,
+                "avg_latency_ms": result.avg_latency_ms,
+                "p50_latency_ms": result.p50_latency_ms,
+                "p99_latency_ms": result.p99_latency_ms,
+                "p999_latency_ms": result.p999_latency_ms,
+                "kb_per_sec": result.kb_per_sec,
+                "duration_s": result.duration_s,
+            },
             "error": result.error,
             "timings": timings_dict,
         }

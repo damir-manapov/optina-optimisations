@@ -11,6 +11,20 @@ from pricing import CloudPricing, get_cloud_pricing  # noqa: F401
 
 
 # ============================================================================
+# Metrics Helpers
+# ============================================================================
+
+
+def get_metric(r: dict, key: str, default: float = 0) -> float:
+    """Get metric value from nested metrics dict or top-level (legacy)."""
+    metrics = r.get("metrics", {})
+    if metrics and key in metrics:
+        return metrics.get(key, default) or default
+    # Fallback to top-level for legacy data
+    return r.get(key, default) or default
+
+
+# ============================================================================
 # SSH Utilities
 # ============================================================================
 

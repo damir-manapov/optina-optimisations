@@ -5,6 +5,7 @@ from pathlib import Path
 from .models import (
     FioMetrics,
     InfraConfig,
+    Metrics,
     ServiceType,
     SysbenchMetrics,
     SystemBaseline,
@@ -25,6 +26,7 @@ def get_store(service: ServiceType) -> TrialStore:
 __all__ = [
     "FioMetrics",
     "InfraConfig",
+    "Metrics",
     "RESULTS_FILE",
     "ServiceType",
     "SysbenchMetrics",

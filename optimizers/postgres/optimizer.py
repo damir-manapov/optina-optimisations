@@ -39,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from common import (
     destroy_all,
+    get_metric,
     get_terraform,
     get_tf_output,
     run_ssh_command,
@@ -118,7 +119,8 @@ def find_cached_result(infra: dict, pg_config: dict, cloud: str) -> dict | None:
         return None
     if trial.error:
         return None
-    if (trial.tps or 0) <= 0:
+    tps = trial.metrics.tps if trial.metrics else 0
+    if (tps or 0) <= 0:
         return None
     return trial.model_dump()
 
@@ -152,7 +154,7 @@ def load_historical_trials(
         for r in store.as_dicts()
         if r.get("cloud") == cloud
         and not r.get("error")
-        and r.get("tps", 0) > 0
+        and get_metric(r, "tps") > 0
         and r.get("infra_config", {}).get("cpu")
     ]
 
@@ -681,11 +683,13 @@ def save_result(
             "mode": mode,
             "infra_config": infra_config,
             "pg_config": pg_config,
-            "tps": result.tps,
-            "latency_avg_ms": result.latency_avg_ms,
-            "latency_stddev_ms": result.latency_stddev_ms,
-            "transactions": result.transactions,
-            "duration_s": result.duration_s,
+            "metrics": {
+                "tps": result.tps,
+                "latency_avg_ms": result.latency_avg_ms,
+                "latency_stddev_ms": result.latency_stddev_ms,
+                "transactions": result.transactions,
+                "duration_s": result.duration_s,
+            },
             "error": result.error,
             "timings": timings_dict,
         }
@@ -717,7 +721,7 @@ def format_results(cloud: str) -> dict | None:
     if not results:
         return None
 
-    results_sorted = sorted(results, key=lambda x: x.get("tps", 0), reverse=True)
+    results_sorted = sorted(results, key=lambda x: get_metric(x, "tps"), reverse=True)
 
     rows = []
     for r in results_sorted:
@@ -726,7 +730,7 @@ def format_results(cloud: str) -> dict | None:
         cloud_name = r.get("cloud", cloud)
         # Calculate cost on-the-fly from infra config
         cost = calculate_cost(infra, cloud_name)
-        tps = r.get("tps", 0)
+        tps = get_metric(r, "tps")
         eff = tps / cost if cost > 0 else 0
         rows.append(
             {
@@ -738,7 +742,7 @@ def format_results(cloud: str) -> dict | None:
                 "wm_mb": pg.get("work_mem_mb", 0),
                 "mc": pg.get("max_connections", 0),
                 "tps": tps,
-                "lat": r.get("latency_avg_ms", 0),
+                "lat": get_metric(r, "latency_avg_ms"),
                 "cost": cost,
                 "eff": eff,
                 "_result": r,  # Keep reference for best calculation

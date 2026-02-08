@@ -32,6 +32,7 @@ from common import (
     clear_known_hosts_on_vm,
     clear_terraform_state,
     destroy_all,
+    get_metric,
     get_terraform,
     get_tf_output,
     is_stale_state_error,
@@ -74,7 +75,7 @@ def format_results(cloud: str) -> dict | None:
         return None
 
     results_sorted = sorted(
-        results, key=lambda x: x.get("total_mib_s", 0), reverse=True
+        results, key=lambda x: get_metric(x, "total_mib_s"), reverse=True
     )
 
     # Extract row data
@@ -84,7 +85,7 @@ def format_results(cloud: str) -> dict | None:
         cloud_name = r.get("cloud", cloud)
         # Calculate cost on-the-fly from config
         cost = calculate_cost(cfg, cloud_name)
-        total = r.get("total_mib_s", 0)
+        total = get_metric(r, "total_mib_s")
         eff = total / cost if cost > 0 else 0
         rows.append(
             {
@@ -95,8 +96,8 @@ def format_results(cloud: str) -> dict | None:
                 "size": cfg.get("drive_size_gb", 0),
                 "dtype": cfg.get("drive_type", "?"),
                 "total": total,
-                "get": r.get("get_mib_s", 0),
-                "put": r.get("put_mib_s", 0),
+                "get": get_metric(r, "get_mib_s"),
+                "put": get_metric(r, "put_mib_s"),
                 "cost": cost,
                 "eff": eff,
                 "_result": r,  # Keep reference for best calculation
@@ -312,7 +313,8 @@ def find_cached_result(config: dict, cloud: str) -> dict | None:
     # Skip failed results - they should be retried
     if trial.error:
         return None
-    if (trial.total_mib_s or 0) <= 0:
+    total = trial.metrics.total_mib_s if trial.metrics else 0
+    if (total or 0) <= 0:
         return None
     # Skip results missing required metrics
     result = trial.model_dump()
@@ -339,7 +341,7 @@ def load_historical_trials(study: optuna.Study, cloud: str, metric: str) -> int:
         for r in store.as_dicts()
         if r.get("cloud") == cloud
         and not r.get("error")
-        and r.get("total_mib_s", 0) > 0
+        and get_metric(r, "total_mib_s") > 0
         and r.get("config", {}).get("cpu_per_node")
     ]
 
@@ -994,10 +996,12 @@ def save_result(
             "login": login,
             "config": config,
             "total_drives": total_drives,
-            "total_mib_s": result.total_mib_s,
-            "get_mib_s": result.get_mib_s,
-            "put_mib_s": result.put_mib_s,
-            "duration_s": result.duration_s,
+            "metrics": {
+                "total_mib_s": result.total_mib_s,
+                "get_mib_s": result.get_mib_s,
+                "put_mib_s": result.put_mib_s,
+                "duration_s": result.duration_s,
+            },
             "error": result.error,
             "system_baseline": baseline_metrics,
             "timings": timings_metrics,
