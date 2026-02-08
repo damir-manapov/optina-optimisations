@@ -42,9 +42,9 @@ from common import (
 from metrics import get_metric_value
 from optimizers.meilisearch.metrics import METRICS
 from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram
-from storage import TrialStore
+from storage import TrialStore, get_store as _get_store
 
-RESULTS_DIR = Path(__file__).parent
+RESULTS_DIR = Path(__file__).parent  # For local files (study.db, markdown)
 STUDY_DB = RESULTS_DIR / "study.db"
 BENCHMARK_SCRIPT = RESULTS_DIR / "benchmark.js"
 DATASET_SCRIPT = RESULTS_DIR / "dataset.py"
@@ -57,6 +57,11 @@ DISK_SIZE_GB = 100
 
 # Dataset config
 DATASET_SIZE = 500000  # 500K products
+
+
+def get_store() -> TrialStore:
+    """Get the TrialStore for Meilisearch results."""
+    return _get_store("meilisearch")
 
 
 def calculate_cost(infra_config: dict, cloud: str) -> float:
@@ -128,15 +133,16 @@ class BenchmarkResult:
 def wait_for_meilisearch_ready(
     vm_ip: str, timeout: int = 300, jump_host: str | None = None
 ) -> bool:
-    """Wait for Meilisearch to be healthy."""
+    """Wait for Meilisearch to be healthy (cloud-init complete + service responding)."""
     print("  Waiting for Meilisearch to be ready...")
 
     start = time.time()
     while time.time() - start < timeout:
         try:
+            # Check cloud-init complete and service healthy
             code, output = run_ssh_command(
                 vm_ip,
-                "curl -sf http://localhost:7700/health",
+                "test -f /root/cloud-init-ready && curl -sf http://localhost:7700/health",
                 timeout=10,
                 jump_host=jump_host,
             )
@@ -468,16 +474,6 @@ MEILI_MAX_INDEXING_THREADS={max_threads if max_threads > 0 else "auto"}
 
     # Wait for it to be ready
     return wait_for_meilisearch_ready(meili_ip, timeout=60, jump_host=jump_host)
-
-
-def results_file() -> Path:
-    """Get results file path."""
-    return RESULTS_DIR / "results.json"
-
-
-def get_store() -> TrialStore:
-    """Get the TrialStore for Meilisearch results."""
-    return TrialStore(results_file(), service="meilisearch")
 
 
 def config_to_key(infra: dict, meili_config: dict, cloud: str) -> str:

@@ -77,6 +77,6 @@ runcmd:
   - systemctl start minio
 
   # Create ready marker
-  - touch /root/minio-ready
+  - touch /root/cloud-init-ready
 
 final_message: "MinIO node ready after $UPTIME seconds"

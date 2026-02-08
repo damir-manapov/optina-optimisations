@@ -36,7 +36,7 @@ from common import (
     run_ssh_command,
     wait_for_vm_ready,
 )
-from storage import TrialStore
+from storage import TrialStore, get_store as _get_store
 
 from optimizers.redis.cloud_config import (
     CloudConfig,
@@ -47,8 +47,13 @@ from metrics import get_metric_value
 from optimizers.redis.metrics import METRICS
 from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram
 
-RESULTS_DIR = Path(__file__).parent
+RESULTS_DIR = Path(__file__).parent  # For local files (study.db, markdown)
 STUDY_DB = RESULTS_DIR / "study.db"
+
+
+def get_store() -> TrialStore:
+    """Get the TrialStore for Redis results."""
+    return _get_store("redis")
 
 
 def config_summary(r: dict) -> str:
@@ -204,16 +209,6 @@ def export_results_md(cloud: str, output_path: Path | None = None) -> None:
 
     output_path.write_text("\n".join(lines))
     print(f"Results exported to {output_path}")
-
-
-def results_file() -> Path:
-    """Get results file path."""
-    return RESULTS_DIR / "results.json"
-
-
-def get_store() -> TrialStore:
-    """Get the TrialStore for Redis results."""
-    return TrialStore(results_file(), service="redis")
 
 
 @dataclass
@@ -406,7 +401,7 @@ def wait_for_redis_ready(
         try:
             check_cmd = (
                 f"ssh -A -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@{redis_ip} "
-                f"'test -f /root/redis-ready && redis-cli ping'"
+                f"'test -f /root/cloud-init-ready && redis-cli ping'"
             )
             code, output = run_ssh_command(
                 vm_ip, check_cmd, timeout=20, forward_agent=True
@@ -788,7 +783,7 @@ Examples:
     print(f"Metric: {args.metric} ({METRICS[args.metric]})")
     print(f"Trials: {args.trials}")
     print(f"Terraform dir: {cloud_config.terraform_dir}")
-    print(f"Results file: {results_file()}")
+    print(f"Results file: {get_store().path}")
     print()
 
     # Ensure benchmark VM exists

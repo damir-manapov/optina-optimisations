@@ -44,7 +44,7 @@ from common import (
     run_ssh_command,
     wait_for_vm_ready,
 )
-from storage import TrialStore
+from storage import TrialStore, get_store as _get_store
 
 from optimizers.postgres.cloud_config import (
     CloudConfig,
@@ -56,11 +56,16 @@ from metrics import get_metric_value
 from optimizers.postgres.metrics import METRICS
 from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram
 
-RESULTS_DIR = Path(__file__).parent
+RESULTS_DIR = Path(__file__).parent  # For local files (study.db, markdown)
 STUDY_DB = RESULTS_DIR / "study.db"
 
 # PostgreSQL version (must match terraform cloud-init)
 PG_VERSION = "18"
+
+
+def get_store() -> TrialStore:
+    """Get the TrialStore for PostgreSQL results."""
+    return _get_store("postgres")
 
 
 class Mode(Enum):
@@ -97,16 +102,6 @@ class BenchmarkResult:
     pgbench_init_s: float = 0.0  # Initialize pgbench tables
     benchmark_s: float = 0.0  # pgbench run
     trial_total_s: float = 0.0  # End-to-end trial time
-
-
-def results_file() -> Path:
-    """Get results file path."""
-    return RESULTS_DIR / "results.json"
-
-
-def get_store() -> TrialStore:
-    """Get the TrialStore for Postgres results."""
-    return TrialStore(results_file(), service="postgres")
 
 
 def config_to_key(infra: dict, pg_config: dict, cloud: str) -> str:
@@ -531,14 +526,15 @@ def wait_for_patroni_ready(
 def wait_for_postgres_ready(
     vm_ip: str, timeout: int = 180, jump_host: str | None = None
 ) -> bool:
-    """Wait for Postgres to be ready."""
+    """Wait for Postgres to be ready (cloud-init complete + service responding)."""
     print("  Waiting for Postgres to be ready...")
 
     start = time.time()
     while time.time() - start < timeout:
         try:
+            # Check cloud-init complete and pg_isready
             code, output = run_ssh_command(
-                vm_ip, "pg_isready", timeout=10, jump_host=jump_host
+                vm_ip, "test -f /root/cloud-init-ready && pg_isready", timeout=10, jump_host=jump_host
             )
             if code == 0:
                 print(f"  Postgres is ready! ({time.time() - start:.0f}s)")

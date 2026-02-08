@@ -1,6 +1,6 @@
 # Redis Benchmark Results - SELECTEL
 
-Generated: 2026-02-08 23:18:06
+Generated: 2026-02-09 03:21:07
 
 ## Results
 
@@ -11,6 +11,7 @@ Generated: 2026-02-08 23:18:06
 | 3 | single | 1 | 2 | 16 | allkeys-lru | 2 | none | 85534 | 3.38 | 7068.00 | 12 |
 | 4 | sentinel | 3 | 2 | 16 | allkeys-lru | 1 | rdb | 81348 | 3.92 | 21204.00 | 4 |
 | 5 | sentinel | 3 | 4 | 4 | allkeys-lru | 2 | none | 78126 | 3.44 | 16566.00 | 5 |
+| 6 | sentinel | 3 | 8 | 32 | volatile-lru | 4 | rdb | 65438 | 4.35 | 44418.00 | 1 |
 
 ## Best Configurations
 
