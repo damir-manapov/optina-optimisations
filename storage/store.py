@@ -185,47 +185,7 @@ class TrialStore:
         for trial in self.trials:
             if not trial.is_successful():
                 continue
-
-            # Match based on service type
-            if self.service == "redis":
-                trial_key = {
-                    "cloud": trial.cloud,
-                    "mode": trial.config.get("mode") if trial.config else None,
-                    "cpu_per_node": trial.config.get("cpu_per_node") if trial.config else None,
-                    "ram_per_node": trial.config.get("ram_per_node") if trial.config else None,
-                    "maxmemory_policy": trial.config.get("maxmemory_policy") if trial.config else None,
-                    "io_threads": trial.config.get("io_threads") if trial.config else None,
-                    "persistence": trial.config.get("persistence") if trial.config else None,
-                }
-            elif self.service == "minio":
-                cfg = trial.config or {}
-                trial_key = {
-                    "cloud": trial.cloud,
-                    "nodes": cfg.get("nodes"),
-                    "cpu_per_node": cfg.get("cpu_per_node"),
-                    "ram_per_node": cfg.get("ram_per_node"),
-                    "drives_per_node": cfg.get("drives_per_node"),
-                    "drive_size_gb": cfg.get("drive_size_gb"),
-                    "drive_type": cfg.get("drive_type"),
-                }
-            elif self.service == "postgres":
-                infra = trial.infra_config.model_dump() if trial.infra_config else {}
-                trial_key = {
-                    "cloud": trial.cloud,
-                    "infra": infra,
-                    "pg": trial.pg_config,
-                }
-            elif self.service == "meilisearch":
-                infra = trial.infra.model_dump() if trial.infra else {}
-                trial_key = {
-                    "cloud": trial.cloud,
-                    "infra": infra,
-                    "config": trial.config,
-                }
-            else:
-                continue
-
-            if trial_key == target:
+            if trial.get_config_key() == target:
                 return trial
 
         return None

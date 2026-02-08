@@ -187,3 +187,47 @@ class Trial(BaseModel):
         if self.service == "minio":
             return self.total_mib_s or 0
         return 0
+
+    def get_config_key(self) -> dict[str, Any]:
+        """Get config key dict for cache matching.
+
+        Returns a dict of config values that uniquely identify this trial's
+        configuration for caching purposes.
+        """
+        if self.service == "redis":
+            cfg = self.config or {}
+            return {
+                "cloud": self.cloud,
+                "mode": cfg.get("mode"),
+                "cpu_per_node": cfg.get("cpu_per_node"),
+                "ram_per_node": cfg.get("ram_per_node"),
+                "maxmemory_policy": cfg.get("maxmemory_policy"),
+                "io_threads": cfg.get("io_threads"),
+                "persistence": cfg.get("persistence"),
+            }
+        if self.service == "minio":
+            cfg = self.config or {}
+            return {
+                "cloud": self.cloud,
+                "nodes": cfg.get("nodes"),
+                "cpu_per_node": cfg.get("cpu_per_node"),
+                "ram_per_node": cfg.get("ram_per_node"),
+                "drives_per_node": cfg.get("drives_per_node"),
+                "drive_size_gb": cfg.get("drive_size_gb"),
+                "drive_type": cfg.get("drive_type"),
+            }
+        if self.service == "postgres":
+            infra = self.infra_config.model_dump() if self.infra_config else {}
+            return {
+                "cloud": self.cloud,
+                "infra": infra,
+                "pg": self.pg_config,
+            }
+        if self.service == "meilisearch":
+            infra = self.infra.model_dump() if self.infra else {}
+            return {
+                "cloud": self.cloud,
+                "infra": infra,
+                "config": self.config,
+            }
+        return {"cloud": self.cloud}
