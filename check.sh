@@ -1,20 +1,25 @@
 #!/bin/bash
 set -e
 
-echo "=== Formatting ==="
+echo "=== Python: Formatting ==="
+uv run ruff format .
+
+echo ""
+echo "=== Python: Linting ==="
+uv run ruff check .
+
+echo ""
+echo "=== Python: Type checking ==="
+uv run pyright .
+
+echo ""
+echo "=== TypeScript checks ==="
+cd benchmarks
 pnpm format
-
-echo ""
-echo "=== Linting ==="
 pnpm lint
-
-echo ""
-echo "=== Type checking ==="
 pnpm typecheck
-
-echo ""
-echo "=== Running tests ==="
 pnpm test
+cd ..
 
 echo ""
 echo "=== Check passed ==="

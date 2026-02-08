@@ -28,7 +28,8 @@ from pathlib import Path
 import optuna
 from optuna.samplers import TPESampler
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add root dir to path for common imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from common import (
     destroy_all,

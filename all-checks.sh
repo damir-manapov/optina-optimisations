@@ -8,7 +8,6 @@ echo "========================================"
 ./check.sh
 ./health.sh
 ./terraform/check.sh
-./optuna/check.sh
 
 echo ""
 echo "========================================"

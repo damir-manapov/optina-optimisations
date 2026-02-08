@@ -1,311 +1,142 @@
-# indexless-query-benchmarks
+# optina-optimisations
 
-Benchmark typical queries on Trino+Iceberg, PostgreSQL, and ClickHouse without indexes.
+Bayesian optimization for cloud infrastructure configurations using [Optuna](https://optuna.org/).
 
 ## Overview
 
-This project benchmarks query performance on tables without traditional indexes, demonstrating how columnar databases and modern storage formats handle full-scan workloads.
+This project automates finding optimal configurations for various products on cloud providers. It deploys infrastructure via Terraform, runs benchmarks, and uses Bayesian optimization to find the best cost-performance trade-offs.
 
-### Assumptions
+## Optimizers
 
-We assume that query parameters — what to filter, order by, how to join tables, etc. — are dynamic and defined by the user at runtime. Thus, queries are not known beforehand and no indexes can be used in most cases.
+| Optimizer | Target | Benchmark Tool | Metrics |
+|-----------|--------|----------------|---------|
+| [optimizers/redis](optimizers/redis/) | Redis cache | memtier_benchmark | ops/sec, p99 latency |
+| [optimizers/minio](optimizers/minio/) | MinIO storage | warp | throughput, IOPS |
+| [optimizers/postgres](optimizers/postgres/) | PostgreSQL | pgbench | TPS, latency |
+| [optimizers/meilisearch](optimizers/meilisearch/) | Meilisearch | k6 | queries/sec |
 
-This may not be your case. You may heavily constrain what users can configure, find ways to define indexes on the fly, or have someone monitor usage and adjust indexes manually. If so, you should perform measurements with the expected indexes yourself.
+## Supported Clouds
 
-### Databases Tested
+- **Selectel** - OpenStack-based, ru-7 region
+- **Timeweb** - TWC API, ru-1 location
 
-- **PostgreSQL** - Traditional RDBMS for baseline comparison
-- **ClickHouse** - Columnar OLAP database
-- **Trino + Iceberg** - Query engine with lakehouse storage
+## Quick Start
 
-### Query Types
+### Prerequisites
 
-**Basic queries:**
+- Python 3.11+ with [uv](https://github.com/astral-sh/uv)
+- [Terraform](https://terraform.io/downloads) >= 1.0
+- Cloud credentials (see [terraform/README.md](terraform/README.md))
 
-- Full count
-- Filter by column
-- Group by with aggregation
-- Range scans
-- Top-N queries
-- String pattern matching (LIKE)
-- Distinct count
-- Percentile calculations
-- Deep pagination - unordered (OFFSET)
-- Deep pagination - ordered (OFFSET + ORDER BY)
-- Deduplication (SELECT DISTINCT)
-
-**JOIN queries:**
-
-- JOIN with filter on lookup table
-- JOIN with aggregate on lookup table
-- JOIN with multiple filter conditions
-- JOIN with range filter
-- JOIN with GROUP BY multiple columns
-
-**Deduplication queries:**
-
-- Find duplicate names (GROUP BY HAVING)
-- Duplicate group size distribution
-- Rank duplicates within groups (window function)
-
-**Matching queries:**
-
-- Match corrupted to samples by exact email
-- Match corrupted email to original
-- Self-join to find duplicate pairs
-- Fuzzy match using Levenshtein distance (expensive)
-
-## Measurements of data generation
-
-All set up done by compose file, minio used as s3 storage.
-
-### Generated entity in Trino
-
-Different count of rows for main table by 100m batches. Id, first, last name from eng dictionaries, float, status, datetime.
-
-### 12 cpu (AMD EPYC 7763 64-Core Processor), 96 ram, fast ssd (25k/15k iops, 500mbs) - selectel
-
-300m total, 100m batch ~56s in 3m 2s, 1,741,988 r/s
-
-600m total, 100m batch ~56s in 6m 6s, 1,721,467 r/s
-
-So writing is definetly linear. It was expected, but worth to check anyway.
-
-### The same, but universal-2 ssd (up to 16k iops, 200mbs) - selectel
-
-One locale minio instance:
-
-- 300m total, 100m batch ~1m 18s in 4m 14s, 1,253,772 r/s
-- 600m total, 100m batch ~1m 18s in 8m 17s, 1,274,608 r/s
-
-Cloud selectel S3:
-
-- 300m total, 100m batch
-- 600m total, 100m batch ~1m 4s in 6m 42s, 1,557,814 r/s
-
-### The same, but universal-1 ssd (7k/4k iops, 200mbs) - selectel
-
-### The same, but base ssd (640/320 iops, 150mbs) - selectel
-
-### The same, but base hdd (320/120 iops, 100mbs) - selectel
-
-## Prerequisites
-
-- Node.js 24+
-- pnpm
-- Docker
-
-## Installation
+### Setup
 
 ```bash
-pnpm install
-```
+# Install Python dependencies
+uv sync
 
-## Cloud Deployment
-
-For running benchmarks on cloud VMs with production MinIO cluster, see [terraform/README.md](terraform/README.md).
-
-Two cloud providers are supported:
-
-- **Selectel** - OpenStack-based, see [terraform/selectel/README.md](terraform/selectel/README.md)
-- **Timeweb** - Simple API, see [terraform/timeweb/README.md](terraform/timeweb/README.md)
-
-For automated infrastructure optimization (MinIO, Redis) using Bayesian search, see [optuna/README.md](optuna/README.md).
-
-```bash
-# Selectel
-cd terraform/selectel
+# Set cloud credentials (Selectel example)
 export TF_VAR_selectel_domain="123456"
 export TF_VAR_selectel_username="your-username"
 export TF_VAR_selectel_password="your-password"
 export TF_VAR_selectel_openstack_password="your-openstack-password"
 
-# Or Timeweb
-cd terraform/timeweb
-export TWC_TOKEN="your-api-token"
-
-# Then
-cp terraform.tfvars.example terraform.tfvars
-terraform init
-terraform apply
+# Initialize Terraform
+cd terraform/selectel && terraform init && cd ../..
 ```
 
-## Usage
-
-### Start Databases
+### Run Optimization
 
 ```bash
+# Redis - optimize for ops/sec
+uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --metric ops_per_sec
+
+# MinIO - optimize for throughput
+uv run python optimizers/minio/optimizer.py --cloud selectel --trials 10
+
+# PostgreSQL - optimize infrastructure
+uv run python optimizers/postgres/optimizer.py --cloud selectel --mode infra --trials 10
+
+# Meilisearch - optimize config
+uv run python optimizers/meilisearch/optimizer.py --cloud selectel --mode config --trials 20
+
+# View results
+uv run python optimizers/redis/optimizer.py --cloud selectel --show-results
+uv run python optimizers/redis/optimizer.py --cloud selectel --export-md
+```
+
+## How It Works
+
+1. **Optuna suggests** a configuration (CPU, RAM, disk, software settings)
+2. **Terraform deploys** infrastructure on the cloud
+3. **Benchmark runs** against the deployed system
+4. **Results logged** and Optuna learns from them
+5. **Repeat** until trials exhausted or convergence
+
+## Configuration Space
+
+Each optimizer tunes different parameters:
+
+| Optimizer | Infrastructure | Software Config |
+|-----------|----------------|-----------------|
+| Redis | CPU, RAM, nodes | io-threads, persistence, eviction policy |
+| MinIO | CPU, RAM, disk type, nodes | erasure coding |
+| PostgreSQL | CPU, RAM, disk | shared_buffers, work_mem, connections |
+| Meilisearch | CPU, RAM | indexing threads, max indexing memory |
+
+## Pricing
+
+Cloud pricing is centralized in [pricing.py](pricing.py):
+- CPU/RAM/disk costs per cloud
+- `cost_efficiency` metric (performance per ₽/month)
+- Cloud constraints (min RAM per CPU, disk types)
+
+## Project Structure
+
+```
+optina-optimisations/
+├── optimizers/           # Bayesian optimizers (main focus)
+│   ├── redis/
+│   ├── minio/
+│   ├── postgres/
+│   ├── meilisearch/
+│   └── storage/          # Optuna study databases
+├── terraform/            # Cloud infrastructure
+│   ├── selectel/
+│   └── timeweb/
+├── benchmarks/           # Database query benchmarks (TypeScript)
+│   ├── src/
+│   ├── compose/
+│   └── package.json
+├── docs/                 # Documentation
+├── common.py             # Shared Python utilities
+├── pricing.py            # Cloud pricing data
+└── pyproject.toml        # Python project config
+```
+
+## Database Benchmarks
+
+The [benchmarks/](benchmarks/) directory contains a TypeScript suite for benchmarking indexless queries on PostgreSQL, ClickHouse, and Trino+Iceberg. See [benchmarks/README.md](benchmarks/package.json) for details.
+
+```bash
+cd benchmarks
+pnpm install
 pnpm compose:up
-```
-
-#### Memory-Constrained Environments
-
-For running a single database with specific memory limits (the limit applies to the database container only; ensure your machine has additional RAM for the host OS):
-
-```bash
-# 16GB machine
-pnpm compose:up:postgres:16gb
-pnpm compose:up:clickhouse:16gb
-pnpm compose:up:trino:16gb
-
-# 32GB machine
-pnpm compose:up:postgres:32gb
-pnpm compose:up:clickhouse:32gb
-pnpm compose:up:trino:32gb
-
-# 64GB machine
-pnpm compose:up:postgres:64gb
-pnpm compose:up:clickhouse:64gb
-pnpm compose:up:trino:64gb
-```
-
-#### MinIO Cluster Mode
-
-For higher S3 throughput, run MinIO in distributed mode with 4 nodes:
-
-```bash
-# Start MinIO cluster (4 nodes)
-pnpm compose:up:minio-cluster
-
-# Start Trino with MinIO cluster backend
-pnpm compose:up:trino:minio-cluster
-
-# Start Trino 64GB with MinIO cluster
-pnpm compose:up:trino:64gb:minio-cluster
-```
-
-#### Standalone MinIO (Terraform-deployed)
-
-When using MinIO deployed via Terraform (see [terraform/README.md](terraform/README.md)), connect Trino to the external cluster:
-
-```bash
-# Start Trino with Terraform-deployed MinIO
-pnpm compose:up:trino:standalone-minio
-
-# Or with 64GB memory config
-pnpm compose:up:trino:64gb:standalone-minio
-```
-
-This uses hardcoded endpoint `10.0.0.10:9000` configured for the Terraform MinIO cluster on the private network.
-
-#### Remote S3 Storage
-
-To use external S3 storage (e.g., Selectel Cloud Storage) instead of local MinIO:
-
-```bash
-# Set credentials
-export S3_ACCESS_KEY=your-access-key
-export S3_SECRET_KEY=your-secret-key
-
-# Start Trino with remote S3
-pnpm compose:up:trino:remote-s3
-
-# Or with 64GB memory config
-pnpm compose:up:trino:64gb:remote-s3
-```
-
-Edit `compose/trino/catalog/iceberg.remote-s3.properties` to configure your S3 endpoint, region, and bucket.
-
-### Generate Test Data
-
-```bash
-# Generate 100 million rows in all databases (default)
-pnpm generate
-
-# Generate custom row count
-pnpm generate -n 1_000_000
-
-# Custom batch size
-pnpm generate -n 10_000_000 -b 1_000_000
-
-# Specific database only
-pnpm generate:postgres -n 10_000_000
-pnpm generate:clickhouse -n 10_000_000
-pnpm generate:trino -n 10_000_000
-
-# Generate with report (JSON + Markdown)
-pnpm generate --postgres --report
-
-# With environment tag for report metadata
-pnpm generate --postgres --env 16gb --report
-```
-
-Generation reports are saved to `reports/generation-*.{json,md}` with per-table timing and throughput stats.
-
-Default batch sizes: 1M for PostgreSQL, 100M for ClickHouse/Trino.
-
-### Run Benchmarks
-
-```bash
-# All databases, all queries
-pnpm benchmark
-
-# Specific database
-pnpm benchmark --postgres
-pnpm benchmark --clickhouse
-pnpm benchmark --trino
-
-# Specific query
-pnpm benchmark -q full-count
-
-# Multiple runs
-pnpm benchmark -r 5 --warmup 2
-
-# Filter by tags
-pnpm benchmark --only matching       # Only matching queries
-pnpm benchmark --only deduplication   # Only deduplication queries
-pnpm benchmark -x expensive           # Skip expensive queries
-
-# Generate reports (JSON + Markdown)
+pnpm generate -n 10_000_000
 pnpm benchmark --report
-
-# With environment tag for report metadata
-pnpm benchmark --postgres --env 16gb --report
 ```
-
-Reports are saved to `reports/` directory with timestamped filenames. Each report includes:
-
-- **Table sizes** - Row counts for each table
-- **Summary table** - Average times per query across databases
-- **Detailed results** - Min/Avg/P95/Max for each query per database
-
-**Available tags:**
-
-| Tag             | Description                                |
-| --------------- | ------------------------------------------ |
-| `basic`         | Simple single-table queries                |
-| `join`          | Queries involving JOINs                    |
-| `deduplication` | Finding duplicates within a single table   |
-| `matching`      | Linking records between tables             |
-| `expensive`     | Queries that may timeout on large datasets |
-
-Reports are saved to `reports/` directory with timestamped filenames.
-
-### Stop Databases
-
-```bash
-pnpm compose:down
-
-# Remove volumes
-pnpm compose:reset
-```
-
-## Docker Services
-
-| Service    | Port(s)                    | Credentials           | Database           |
-| ---------- | -------------------------- | --------------------- | ------------------ |
-| PostgreSQL | 5432                       | postgres:postgres     | benchmarks         |
-| ClickHouse | 8123 (HTTP), 9009 (native) | default:clickhouse    | benchmarks         |
-| Trino      | 8080                       | trino (no password)   | iceberg.benchmarks |
-| MinIO      | 9000 (S3), 9001 (console)  | minioadmin:minioadmin | -                  |
-| Nessie     | 19120                      | -                     | -                  |
 
 ## Development
 
 ```bash
-# Format, lint, typecheck, test
-./check.sh
+# Python checks
+./check.sh  # ruff format, lint, pyright
 
-# Full checks including security
+# Full checks
 ./all-checks.sh
 ```
+
+## Documentation
+
+- [docs/OPTIMIZERS.md](docs/OPTIMIZERS.md) - Optimizer usage guide
+- [docs/OPTIMIZER_GUIDE.md](docs/OPTIMIZER_GUIDE.md) - How to create new optimizers
+- [terraform/README.md](terraform/README.md) - Cloud setup instructions

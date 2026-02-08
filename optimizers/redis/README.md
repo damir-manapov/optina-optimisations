@@ -21,7 +21,7 @@ Bayesian optimization for finding the best Redis configuration using Optuna.
 ## Setup
 
 ```bash
-cd optuna
+# From project root
 uv sync
 ```
 
@@ -29,22 +29,22 @@ uv sync
 
 ```bash
 # Optimize for ops/sec (higher is better)
-uv run python redis-optimizer/optimizer.py --cloud selectel --trials 10 --metric ops_per_sec
+uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --metric ops_per_sec
 
 # Optimize for p99 latency (lower is better)
-uv run python redis-optimizer/optimizer.py --cloud selectel --trials 10 --metric p99_latency_ms
+uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --metric p99_latency_ms
 
 # Optimize for cost efficiency (ops/sec per $/hr)
-uv run python redis-optimizer/optimizer.py --cloud selectel --trials 10 --metric cost_efficiency
+uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --metric cost_efficiency
 
 # Keep infrastructure after optimization
-uv run python redis-optimizer/optimizer.py --cloud selectel --trials 10 --no-destroy
+uv run python optimizers/redis/optimizer.py --cloud selectel --trials 10 --no-destroy
 
 # Show all benchmark results
-uv run python redis-optimizer/optimizer.py --cloud selectel --show-results
+uv run python optimizers/redis/optimizer.py --cloud selectel --show-results
 
 # Export results to markdown
-uv run python redis-optimizer/optimizer.py --cloud selectel --export-md
+uv run python optimizers/redis/optimizer.py --cloud selectel --export-md
 ```
 
 ### From Scratch
@@ -54,11 +54,11 @@ uv run python redis-optimizer/optimizer.py --cloud selectel --export-md
 cd terraform/selectel
 terraform destroy -auto-approve
 rm -f terraform.tfstate terraform.tfstate.backup
-cd ../../optuna
-rm -f redis-optimizer/study.db redis-optimizer/results.json
+cd ../..
+rm -f optimizers/redis/study.db optimizers/redis/results.json
 
 # Run - it will create everything from scratch
-uv run python redis-optimizer/optimizer.py --cloud selectel --trials 5
+uv run python optimizers/redis/optimizer.py --cloud selectel --trials 5
 ```
 
 ## Configuration Space
