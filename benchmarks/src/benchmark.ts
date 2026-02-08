@@ -1,19 +1,19 @@
-import { parseArgs } from "node:util";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-  PostgresRunner,
-  ClickHouseRunner,
-  TrinoRunner,
-  runBenchmark,
-  type DatabaseRunner,
-} from "./runners.js";
+import { parseArgs } from "node:util";
 import { QUERIES } from "./queries.js";
 import {
-  formatDuration,
+  ClickHouseRunner,
+  type DatabaseRunner,
+  PostgresRunner,
+  runBenchmark,
+  TrinoRunner,
+} from "./runners.js";
+import {
   calculateStats,
-  getEnvironmentInfo,
   type EnvironmentInfo,
+  formatDuration,
+  getEnvironmentInfo,
 } from "./utils.js";
 
 interface QueryResult {
@@ -148,11 +148,11 @@ async function benchmarkDatabase(runner: DatabaseRunner): Promise<DatabaseResult
     try {
       dbResult.tableSizes = await runner.getTableSizes();
       console.log(
-        `Tables: ${dbResult.tableSizes.map((t) => `${t.table}(${t.rows.toLocaleString()})`).join(", ")}`
+        `Tables: ${dbResult.tableSizes.map((t) => `${t.table}(${t.rows.toLocaleString()})`).join(", ")}`,
       );
     } catch (error) {
       console.log(
-        `  Could not get table sizes: ${error instanceof Error ? error.message : String(error)}`
+        `  Could not get table sizes: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
 
@@ -195,7 +195,7 @@ async function benchmarkDatabase(runner: DatabaseRunner): Promise<DatabaseResult
       const stats = calculateStats(durations);
       console.log(
         `  Results: min=${formatDuration(stats.min)}, avg=${formatDuration(stats.avg)}, ` +
-          `p95=${formatDuration(stats.p95)}, max=${formatDuration(stats.max)}`
+          `p95=${formatDuration(stats.p95)}, max=${formatDuration(stats.max)}`,
       );
 
       dbResult.results.push({
@@ -362,7 +362,7 @@ function generateMarkdown(report: BenchmarkReport): string {
         lines.push(`| ${r.query} | ERROR | - | - | - |`);
       } else {
         lines.push(
-          `| ${r.query} | ${formatDuration(r.minMs)} | ${formatDuration(r.avgMs)} | ${formatDuration(r.p95Ms)} | ${formatDuration(r.maxMs)} |`
+          `| ${r.query} | ${formatDuration(r.minMs)} | ${formatDuration(r.avgMs)} | ${formatDuration(r.p95Ms)} | ${formatDuration(r.maxMs)} |`,
         );
       }
     }
@@ -373,7 +373,7 @@ function generateMarkdown(report: BenchmarkReport): string {
   const allErrors = report.databases.flatMap((db) =>
     db.results
       .filter((r) => r.error)
-      .map((r) => ({ database: db.database, query: r.query, error: r.error }))
+      .map((r) => ({ database: db.database, query: r.query, error: r.error })),
   );
   if (allErrors.length > 0) {
     lines.push("## Errors");

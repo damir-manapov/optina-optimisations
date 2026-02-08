@@ -10,7 +10,9 @@ gitleaks detect --source . -v
 
 echo ""
 echo "=== Checking for vulnerabilities ==="
+cd benchmarks
 pnpm audit --prod
+cd ..
 
 echo ""
 echo "=== Checking for outdated dependencies ==="

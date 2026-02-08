@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { formatDuration, calculateStats } from "../src/utils.js";
+import { describe, expect, it } from "vitest";
 import { QUERIES } from "../src/queries.js";
+import { calculateStats, formatDuration } from "../src/utils.js";
 
 describe("formatDuration", () => {
   it("formats milliseconds", () => {

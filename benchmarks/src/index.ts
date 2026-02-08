@@ -1,10 +1,10 @@
 export { QUERIES } from "./queries.js";
-export { formatDuration, calculateStats } from "./utils.js";
-export type { BenchmarkResult, QueryDefinition, BenchmarkConfig } from "./types.js";
 export {
-  PostgresRunner,
   ClickHouseRunner,
-  TrinoRunner,
-  runBenchmark,
   type DatabaseRunner,
+  PostgresRunner,
+  runBenchmark,
+  TrinoRunner,
 } from "./runners.js";
+export type { BenchmarkConfig, BenchmarkResult, QueryDefinition } from "./types.js";
+export { calculateStats, formatDuration } from "./utils.js";

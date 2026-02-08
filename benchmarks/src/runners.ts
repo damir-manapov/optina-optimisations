@@ -1,6 +1,6 @@
 import { createClient } from "@clickhouse/client";
 import postgres from "postgres";
-import { Trino, BasicAuth } from "trino-client";
+import { BasicAuth, Trino } from "trino-client";
 import type { BenchmarkResult, QueryDefinition } from "./types.js";
 
 export interface TableSize {
@@ -176,7 +176,7 @@ export class TrinoRunner implements DatabaseRunner {
     const sizes: TableSize[] = [];
     for (const table of tableNames) {
       const countResult = await this.trino.query(
-        `SELECT COUNT(*) FROM iceberg.benchmarks.${table}`
+        `SELECT COUNT(*) FROM iceberg.benchmarks.${table}`,
       );
       for await (const result of countResult) {
         const trinoResult = result as { error?: { message: string }; data?: unknown[][] };
@@ -192,7 +192,7 @@ export class TrinoRunner implements DatabaseRunner {
 export async function runBenchmark(
   runner: DatabaseRunner,
   queryDef: QueryDefinition,
-  runs: number
+  runs: number,
 ): Promise<BenchmarkResult[]> {
   const sql = queryDef.sql[runner.name as keyof typeof queryDef.sql];
   if (!sql) {

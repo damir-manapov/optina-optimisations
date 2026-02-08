@@ -1,21 +1,21 @@
-import { parseArgs } from "node:util";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { parseArgs } from "node:util";
 import {
-  PostgresDataGenerator,
-  ClickHouseDataGenerator,
-  TrinoDataGenerator,
-  type TableConfig,
-  type BaseDataGenerator,
-  type Scenario,
-  type ScenarioResult,
-} from "@mkven/samples-generation";
-import { formatDuration, getEnvironmentInfo, type EnvironmentInfo } from "./utils.js";
-import {
-  getEnglishMaleNames,
   getEnglishFemaleNames,
+  getEnglishMaleNames,
   getEnglishSurnames,
 } from "@mkven/name-dictionaries";
+import {
+  type BaseDataGenerator,
+  ClickHouseDataGenerator,
+  PostgresDataGenerator,
+  type Scenario,
+  type ScenarioResult,
+  type TableConfig,
+  TrinoDataGenerator,
+} from "@mkven/samples-generation";
+import { type EnvironmentInfo, formatDuration, getEnvironmentInfo } from "./utils.js";
 
 const { values } = parseArgs({
   options: {
@@ -373,7 +373,7 @@ async function generateForDatabase(config: DatabaseConfig): Promise<DatabaseGene
 
     const durationStr = formatDuration(result.durationMs);
     console.log(
-      `Generated ${result.totalRowsInserted.toLocaleString()} total rows in ${durationStr}`
+      `Generated ${result.totalRowsInserted.toLocaleString()} total rows in ${durationStr}`,
     );
 
     return buildDatabaseResult(config.name, result);
@@ -384,12 +384,12 @@ async function generateForDatabase(config: DatabaseConfig): Promise<DatabaseGene
 
 function buildDatabaseResult(
   databaseName: string,
-  result: ScenarioResult
+  result: ScenarioResult,
 ): DatabaseGenerationResult {
   const tables: TableResult[] = result.steps
     .filter(
       (step): step is typeof step & { generate: NonNullable<typeof step.generate> } =>
-        step.generate !== undefined
+        step.generate !== undefined,
     )
     .map((step) => {
       const gen = step.generate;
@@ -428,7 +428,7 @@ async function main(): Promise<void> {
         (db) =>
           (values.postgres && db.name === "PostgreSQL") ||
           (values.clickhouse && db.name === "ClickHouse") ||
-          (values.trino && db.name === "Trino/Iceberg")
+          (values.trino && db.name === "Trino/Iceberg"),
       );
 
   // Build command to reproduce
@@ -517,7 +517,7 @@ function generateMarkdown(report: GenerationReport): string {
 
   for (const db of report.databases) {
     lines.push(
-      `| ${db.database} | ${db.totalRows.toLocaleString()} | ${formatDuration(db.totalDurationMs)} | ${db.totalRowsPerSecond.toLocaleString()} |`
+      `| ${db.database} | ${db.totalRows.toLocaleString()} | ${formatDuration(db.totalDurationMs)} | ${db.totalRowsPerSecond.toLocaleString()} |`,
     );
   }
 
@@ -532,7 +532,7 @@ function generateMarkdown(report: GenerationReport): string {
     lines.push("|-------|------|----------|----------|----------|----------|---------|");
     for (const t of db.tables) {
       lines.push(
-        `| ${t.table} | ${t.rows.toLocaleString()} | ${formatDuration(t.durationMs)} | ${formatDuration(t.generateMs)} | ${formatDuration(t.optimizeMs)} | ${t.rowsPerSecond.toLocaleString()} | ${String(t.batchCount)} |`
+        `| ${t.table} | ${t.rows.toLocaleString()} | ${formatDuration(t.durationMs)} | ${formatDuration(t.generateMs)} | ${formatDuration(t.optimizeMs)} | ${t.rowsPerSecond.toLocaleString()} | ${String(t.batchCount)} |`,
       );
     }
     lines.push("");
@@ -549,7 +549,7 @@ function generateMarkdown(report: GenerationReport): string {
           const batchMs = t.batchDurations[i] ?? 0;
           const batchRowsPerSec = batchMs > 0 ? Math.round((rowsPerBatch / batchMs) * 1000) : 0;
           lines.push(
-            `| ${String(i + 1)} | ${formatDuration(batchMs)} | ${batchRowsPerSec.toLocaleString()} |`
+            `| ${String(i + 1)} | ${formatDuration(batchMs)} | ${batchRowsPerSec.toLocaleString()} |`,
           );
         }
         lines.push("");

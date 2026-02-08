@@ -13,11 +13,17 @@ echo "=== Python: Type checking ==="
 uv run pyright .
 
 echo ""
-echo "=== TypeScript checks ==="
+echo "=== TypeScript: Biome check ==="
 cd benchmarks
-pnpm format
 pnpm lint
+pnpm check
+
+echo ""
+echo "=== TypeScript: Type checking ==="
 pnpm typecheck
+
+echo ""
+echo "=== TypeScript: Tests ==="
 pnpm test
 cd ..
 

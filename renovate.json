@@ -2,6 +2,12 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
   "pep621": {
-    "fileMatch": ["optuna/pyproject.toml"]
-  }
+    "fileMatch": ["pyproject.toml"]
+  },
+  "hostRules": [
+    {
+      "matchHost": "index.docker.io",
+      "timeout": 30000
+    }
+  ]
 }
