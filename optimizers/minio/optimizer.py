@@ -6,11 +6,11 @@ Supports both Selectel and Timeweb Cloud providers.
 Automatically creates benchmark VM if not provided.
 
 Usage:
-    uv run python minio-optimizer/optimizer.py --cloud selectel --trials 5
-    uv run python minio-optimizer/optimizer.py --cloud selectel --trials 10 --metric cost_efficiency
-    uv run python minio-optimizer/optimizer.py --cloud timeweb --trials 10 --no-destroy
-    uv run python minio-optimizer/optimizer.py --cloud selectel --show-results
-    uv run python minio-optimizer/optimizer.py --cloud selectel --export-md
+    uv run python optimizers/minio/optimizer.py --cloud selectel --trials 5
+    uv run python optimizers/minio/optimizer.py --cloud selectel --trials 10 --metric cost_efficiency
+    uv run python optimizers/minio/optimizer.py --cloud timeweb --trials 10 --no-destroy
+    uv run python optimizers/minio/optimizer.py --cloud selectel --show-results
+    uv run python optimizers/minio/optimizer.py --cloud selectel --export-md
 """
 
 import argparse

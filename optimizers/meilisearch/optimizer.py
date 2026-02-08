@@ -8,13 +8,13 @@ Supports two optimization modes:
 
 Usage:
     # Infrastructure optimization
-    uv run python meilisearch-optimizer/optimizer.py --cloud selectel --mode infra --trials 10
+    uv run python optimizers/meilisearch/optimizer.py --cloud selectel --mode infra --trials 10
 
     # Config optimization on fixed host
-    uv run python meilisearch-optimizer/optimizer.py --cloud selectel --mode config --cpu 8 --ram 16 --trials 20
+    uv run python optimizers/meilisearch/optimizer.py --cloud selectel --mode config --cpu 8 --ram 16 --trials 20
 
     # Full optimization
-    uv run python meilisearch-optimizer/optimizer.py --cloud selectel --mode full --trials 15
+    uv run python optimizers/meilisearch/optimizer.py --cloud selectel --mode full --trials 15
 """
 
 import argparse
@@ -1159,6 +1159,9 @@ def main():
     parser.add_argument(
         "--show-results", action="store_true", help="Show results and exit"
     )
+    parser.add_argument(
+        "--export-md", action="store_true", help="Export results to markdown and exit"
+    )
 
     args = parser.parse_args()
     cloud_config = get_cloud_config(args.cloud)
@@ -1174,6 +1177,9 @@ def main():
 
     if args.show_results:
         show_results(args.cloud)
+        return
+
+    if args.export_md:
         export_results_md(args.cloud)
         return
 

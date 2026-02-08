@@ -8,17 +8,17 @@ Supports two optimization modes:
 
 Usage:
     # Infrastructure optimization (tune VM specs)
-    uv run python postgres-optimizer/optimizer.py --cloud timeweb --mode infra --trials 10
+    uv run python optimizers/postgres/optimizer.py --cloud timeweb --mode infra --trials 10
 
     # Config optimization on fixed host (faster, more trials)
-    uv run python postgres-optimizer/optimizer.py --cloud timeweb --mode config --cpu 8 --ram 32 --trials 50
+    uv run python optimizers/postgres/optimizer.py --cloud timeweb --mode config --cpu 8 --ram 32 --trials 50
 
     # Full optimization (infra first, then config on best host)
-    uv run python postgres-optimizer/optimizer.py --cloud timeweb --mode full --trials 20
+    uv run python optimizers/postgres/optimizer.py --cloud timeweb --mode full --trials 20
 
     # Show results / export
-    uv run python postgres-optimizer/optimizer.py --cloud timeweb --show-results
-    uv run python postgres-optimizer/optimizer.py --cloud timeweb --export-md
+    uv run python optimizers/postgres/optimizer.py --cloud timeweb --show-results
+    uv run python optimizers/postgres/optimizer.py --cloud timeweb --export-md
 """
 
 import argparse
@@ -57,6 +57,9 @@ from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
+
+# PostgreSQL version (must match terraform cloud-init)
+PG_VERSION = "18"
 
 
 class Mode(Enum):
@@ -344,8 +347,8 @@ def reconfigure_postgres_single(
     """Reconfigure single Postgres node via conf.d."""
     config_content = generate_postgresql_conf(pg_config, ram_gb)
 
-    # Upload config (PostgreSQL 18)
-    upload_cmd = f"cat > /etc/postgresql/18/main/conf.d/tuning.conf << 'EOF'\n{config_content}\nEOF"
+    # Upload config (PostgreSQL {PG_VERSION})
+    upload_cmd = f"cat > /etc/postgresql/{PG_VERSION}/main/conf.d/tuning.conf << 'EOF'\n{config_content}\nEOF"
     code, output = run_ssh_command(vm_ip, upload_cmd, timeout=30, jump_host=jump_host)
     if code != 0:
         print(f"  Failed to upload config: {output}")
