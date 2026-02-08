@@ -1067,42 +1067,27 @@ curl -sf -X DELETE 'http://{meili_ip}:7700/indexes/products' \\
 
 def main():
     parser = argparse.ArgumentParser(description="Meilisearch Configuration Optimizer")
-    parser.add_argument(
-        "--cloud",
-        "-c",
-        required=True,
-        choices=["selectel", "timeweb"],
-        help="Cloud provider",
+
+    # Use common argument helpers
+    from argparse_helpers import add_common_arguments
+
+    add_common_arguments(
+        parser,
+        metrics=METRICS,
+        default_metric="qps",
+        default_trials=10,
+        with_mode=True,
+        mode_default="infra",
+        with_fixed_host=True,
+        cpu_default=4,
+        ram_default=8,
+        with_benchmark_vm=False,
     )
-    parser.add_argument(
-        "--mode",
-        "-m",
-        required=True,
-        choices=["infra", "config", "full"],
-        help="Optimization mode",
-    )
-    parser.add_argument("--trials", "-t", type=int, default=10, help="Number of trials")
-    parser.add_argument(
-        "--metric",
-        default="qps",
-        choices=["qps", "p95_ms", "cost_efficiency", "indexing_time"],
-        help="Metric to optimize (qps=throughput, p95_ms=latency, cost_efficiency=QPS/₽)",
-    )
-    parser.add_argument("--cpu", type=int, default=4, help="Fixed CPU for config mode")
-    parser.add_argument(
-        "--ram", type=int, default=8, help="Fixed RAM GB for config mode"
-    )
-    parser.add_argument(
-        "--no-destroy",
-        action="store_true",
-        help="Keep infrastructure after optimization",
-    )
-    parser.add_argument(
-        "--show-results", action="store_true", help="Show results and exit"
-    )
-    parser.add_argument(
-        "--export-md", action="store_true", help="Export results to markdown and exit"
-    )
+    # Mode is required for Meilisearch, override the default
+    for action in parser._actions:
+        if action.dest == "mode":
+            action.required = True
+            break
 
     args = parser.parse_args()
     cloud_config = get_cloud_config(args.cloud)

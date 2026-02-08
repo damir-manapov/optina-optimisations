@@ -1091,35 +1091,30 @@ def main():
         epilog="""
 Examples:
   # Tune VM specs
-  uv run python postgres-optimizer/optimizer.py --cloud timeweb --mode infra --trials 10
+  uv run python optimizers/postgres/optimizer.py --cloud timeweb --mode infra --trials 10
 
   # Tune postgresql.conf on 8cpu/32gb host
-  uv run python postgres-optimizer/optimizer.py --cloud timeweb --mode config --cpu 8 --ram 32 --trials 50
+  uv run python optimizers/postgres/optimizer.py --cloud timeweb --mode config --cpu 8 --ram 32 --trials 50
 
   # Full optimization
-  uv run python postgres-optimizer/optimizer.py --cloud timeweb --mode full --trials 20
+  uv run python optimizers/postgres/optimizer.py --cloud timeweb --mode full --trials 20
 """,
     )
 
-    parser.add_argument("--cloud", required=True, choices=["selectel", "timeweb"])
-    parser.add_argument("--mode", choices=["infra", "config", "full"], default="config")
-    parser.add_argument("--trials", type=int, default=20)
-    parser.add_argument("--metric", choices=list(METRICS.keys()), default="tps")
+    # Use common argument helpers
+    from argparse_helpers import add_common_arguments
 
-    # Fixed host settings for config mode
-    parser.add_argument("--cpu", type=int, default=4, help="CPU cores for config mode")
-    parser.add_argument("--ram", type=int, default=16, help="RAM GB for config mode")
-
-    parser.add_argument(
-        "--no-destroy", action="store_true", help="Don't destroy infra at end"
+    add_common_arguments(
+        parser,
+        metrics=METRICS,
+        default_metric="tps",
+        default_trials=20,
+        with_mode=True,
+        with_fixed_host=True,
+        cpu_default=4,
+        ram_default=16,
+        with_benchmark_vm=False,
     )
-    parser.add_argument(
-        "--show-results", action="store_true", help="Show results and exit"
-    )
-    parser.add_argument(
-        "--export-md", action="store_true", help="Export to markdown and exit"
-    )
-
     args = parser.parse_args()
 
     cloud_config = get_cloud_config(args.cloud)
