@@ -94,5 +94,32 @@
     "kb_per_sec": 7076.61,
     "duration_s": 61.77630949020386,
     "error": null
+  },
+  {
+    "trial": 0,
+    "timestamp": "2026-02-08T23:18:06.755375",
+    "cloud": "selectel",
+    "config": {
+      "mode": "single",
+      "cpu_per_node": 4,
+      "ram_per_node": 16,
+      "maxmemory_policy": "allkeys-lru",
+      "io_threads": 1,
+      "persistence": "rdb"
+    },
+    "nodes": 1,
+    "ops_per_sec": 92591.93,
+    "avg_latency_ms": 2.15917,
+    "p50_latency_ms": 2.095,
+    "p99_latency_ms": 3.855,
+    "p999_latency_ms": 9.983,
+    "kb_per_sec": 8387.81,
+    "duration_s": 63.404165506362915,
+    "error": null,
+    "timings": {
+      "redis_deploy_s": 253.65268921852112,
+      "benchmark_s": 63.40470361709595,
+      "trial_total_s": 358.5909125804901
+    }
   }
 ]
