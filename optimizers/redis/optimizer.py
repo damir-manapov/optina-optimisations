@@ -587,10 +587,18 @@ def parse_memtier_output(output: str, duration: float) -> BenchmarkResult:
 def calculate_cost(config: dict, cloud: str) -> float:
     """Estimate monthly cost for the configuration."""
     nodes = 1 if config["mode"] == "single" else 3
+    # Handle Optuna's CPU-specific param names (ram_per_node_cpu2 -> ram_per_node)
+    ram = config.get("ram_per_node")
+    if ram is None:
+        for key, val in config.items():
+            if key.startswith("ram_per_node_cpu"):
+                ram = val
+                break
+    assert ram is not None, f"Could not find ram_per_node in config: {config}"
     return calculate_vm_cost(
         cloud=cloud,
         cpu=config["cpu_per_node"],
-        ram_gb=config["ram_per_node"],
+        ram_gb=ram,
         disks=[DiskConfig(size_gb=50, disk_type="fast")],
         nodes=nodes,
     )
