@@ -41,15 +41,21 @@ This project automates finding optimal configurations for various products on cl
 ### Installation
 
 ```bash
-# macOS
-brew install uv terraform node pnpm gitleaks jq
-brew install --cask docker
-
 # Ubuntu/Debian
 curl -LsSf https://astral.sh/uv/install.sh | sh
-sudo apt install -y terraform nodejs npm jq docker.io docker-compose
-npm install -g pnpm
-# gitleaks: download from https://github.com/gitleaks/gitleaks/releases
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs jq docker.io docker-compose-plugin
+sudo npm install -g pnpm
+
+# Terraform
+wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install -y terraform
+
+# gitleaks
+GITLEAKS_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r .tag_name)
+wget https://github.com/gitleaks/gitleaks/releases/download/${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION#v}_linux_x64.tar.gz
+tar -xzf gitleaks_*.tar.gz gitleaks && sudo mv gitleaks /usr/local/bin/ && rm gitleaks_*.tar.gz
 ```
 
 ### Setup
