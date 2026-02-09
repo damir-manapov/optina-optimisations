@@ -156,9 +156,6 @@ locals {
   # Chown directories
   chown_dirs = join(" ", [for i in range(1, var.minio_drives_per_node + 1) : "/data${i}"])
 
-  # Total drives across cluster
-  total_drives = var.minio_node_count * var.minio_drives_per_node
-
   # MinIO volume spec:
   # - Single node with single drive: /data1 (no erasure coding, simple mode)
   # - Single node with multiple drives: /data{1...N} (single-node erasure)

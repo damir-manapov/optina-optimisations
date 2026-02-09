@@ -76,8 +76,7 @@ NESSIE_PORT = 19120
 TRINO_PORT = 8080
 
 # Data generation
-SAMPLES_GENERATION_REPO = "https://github.com/making-ventures/samples-generation"
-DEFAULT_ROW_COUNT = 500_000_000  # 10M rows for benchmark
+DEFAULT_ROW_COUNT = 500_000_000  # 500M rows for benchmark
 
 
 def get_store() -> TrialStore:
@@ -155,8 +154,8 @@ def wait_for_trino_ready(
         cmd = f"curl -s -o /dev/null -w '%{{http_code}}' http://localhost:{TRINO_PORT}/v1/info"
         code, output = run_ssh_command(vm_ip, cmd, timeout=30, jump_host=jump_host)
         if code == 0 and output.strip() == "200":
-            # Also verify we can run a simple query
-            test_cmd = "trino --execute 'SELECT 1' 2>/dev/null"
+            # Also verify we can run a simple query via trino CLI
+            test_cmd = "java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute 'SELECT 1' 2>/dev/null"
             code, _ = run_ssh_command(vm_ip, test_cmd, timeout=30, jump_host=jump_host)
             if code == 0:
                 print(f"  Trino ready in {time.time() - start:.1f}s")
@@ -297,24 +296,14 @@ def reconfigure_trino(
 
 
 def setup_samples_generation(vm_ip: str, jump_host: str | None = None) -> bool:
-    """Ensure samples-generation is installed on the VM."""
-    # Check if already installed
-    check_cmd = "test -d /opt/samples-generation && echo 'exists'"
-    code, output = run_ssh_command(vm_ip, check_cmd, timeout=10, jump_host=jump_host)
-    if code == 0 and "exists" in output:
-        return True
-
-    print("  Installing samples-generation...")
-    install_cmd = f"""
-cd /opt && \
-git clone {SAMPLES_GENERATION_REPO} samples-generation && \
-cd samples-generation && \
-pnpm install
-"""
-    code, output = run_ssh_command(vm_ip, install_cmd, timeout=300, jump_host=jump_host)
+    """Ensure npx is available for @mkven/samples-generation CLI."""
+    # Just verify Node.js and npm are installed (done by cloud-init)
+    check_cmd = "which npx && npx --version"
+    code, output = run_ssh_command(vm_ip, check_cmd, timeout=30, jump_host=jump_host)
     if code != 0:
-        print(f"  Failed to install samples-generation: {output[:500]}")
+        print(f"  npx not available: {output}")
         return False
+    print(f"  npx available: {output.strip()}")
     return True
 
 
@@ -323,10 +312,14 @@ def generate_data(
     trino_config: dict,
     row_count: int = DEFAULT_ROW_COUNT,
     jump_host: str | None = None,
+    max_retries: int = 3,
 ) -> tuple[bool, float]:
     """Generate test data using samples-generation.
 
     Returns (success, duration_seconds).
+
+    Note: Nessie catalog has optimistic locking that can cause race conditions.
+    We use retries to handle "ref hash is out of date" errors.
     """
     print(f"  Generating {row_count:,} rows with samples-generation...")
 
@@ -393,27 +386,56 @@ def generate_data(
         print(f"  Failed to write scenario: {output}")
         return False, 0
 
-    # First drop existing table if any
-    drop_cmd = 'trino --execute "DROP TABLE IF EXISTS iceberg.warehouse.benchmark" 2>/dev/null || true'
+    # First drop existing table if any (use trino CLI directly)
+    drop_cmd = 'java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute "DROP TABLE IF EXISTS iceberg.warehouse.benchmark" 2>/dev/null || true'
     run_ssh_command(vm_ip, drop_cmd, timeout=60, jump_host=jump_host)
 
-    # Generate data using npx tsx
+    # Generate data using @mkven/samples-generation CLI with retries
+    # Nessie can have "ref hash is out of date" errors due to optimistic locking
     batch_size = min(row_count, 10_000_000)  # 10M per batch max
     gen_cmd = f"""
-cd /opt/samples-generation && \
-npx tsx scripts/generate-all.ts \
+npx @mkven/samples-generation /tmp/benchmark_scenario.json \
     --trino \
-    --scenario-file /tmp/benchmark_scenario.json \
+    --trino-host localhost \
+    --trino-port 8080 \
+    --trino-catalog iceberg \
+    --trino-schema warehouse \
     -r {row_count} \
     -b {batch_size} \
+    --drop \
     2>&1
 """
+
     start = time.time()
-    code, output = run_ssh_command(vm_ip, gen_cmd, timeout=3600, jump_host=jump_host)
+    last_error = ""
+
+    for attempt in range(1, max_retries + 1):
+        code, output = run_ssh_command(
+            vm_ip, gen_cmd, timeout=3600, jump_host=jump_host
+        )
+
+        if code == 0 and "Error" not in output:
+            break
+
+        last_error = output[:500]
+
+        # Check for Nessie race condition error
+        if "ref hash is out of date" in output:
+            print(f"  Nessie race condition, retrying ({attempt}/{max_retries})...")
+            time.sleep(2)
+            continue
+        elif "Error" in output:
+            print(f"  Data generation attempt {attempt} failed: {last_error}")
+            if attempt < max_retries:
+                time.sleep(5)
+            continue
+        else:
+            break
+
     duration = time.time() - start
 
-    if code != 0:
-        print(f"  Data generation failed: {output[:500]}")
+    if code != 0 or "Error" in output:
+        print(f"  Data generation failed after {max_retries} attempts: {last_error}")
         return False, duration
 
     # Apply table properties (compression, partitioning) by recreating table
@@ -425,15 +447,16 @@ npx tsx scripts/generate-all.ts \
             props_items = ", ".join(f"'{k}' = '{v}'" for k, v in table_props.items())
             props_clause = f"WITH ({props_items})"
 
+        # Use full path to trino-cli
         recreate_cmd = f"""
-trino --execute "
+java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute "
 CREATE TABLE iceberg.warehouse.benchmark_opt
 {partition_spec}
 {props_clause}
 AS SELECT * FROM iceberg.warehouse.benchmark
 " 2>&1 && \\
-trino --execute "DROP TABLE iceberg.warehouse.benchmark" 2>&1 && \\
-trino --execute "ALTER TABLE iceberg.warehouse.benchmark_opt RENAME TO benchmark" 2>&1
+java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute "DROP TABLE iceberg.warehouse.benchmark" 2>&1 && \\
+java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute "ALTER TABLE iceberg.warehouse.benchmark_opt RENAME TO benchmark" 2>&1
 """
         code, output = run_ssh_command(
             vm_ip, recreate_cmd, timeout=1800, jump_host=jump_host
@@ -465,12 +488,33 @@ def run_lookup_by_id_benchmark(
         f"  Running lookup benchmark ({warmup}s warmup + {duration}s measured, {concurrency} concurrent) from benchmark VM..."
     )
 
+    # Ensure trino CLI is available on benchmark VM
+    setup_cmd = """
+if [ ! -f /usr/local/bin/trino-cli.jar ]; then
+    echo "Installing Trino CLI on benchmark VM..."
+    wget -q https://repo1.maven.org/maven2/io/trino/trino-cli/467/trino-cli-467-executable.jar -O /usr/local/bin/trino-cli.jar
+    chmod +x /usr/local/bin/trino-cli.jar
+fi
+# Create wrapper script if not exists
+if [ ! -f /usr/local/bin/trino ]; then
+    cat > /usr/local/bin/trino << 'EOFWRAPPER'
+#!/bin/bash
+exec java -jar /usr/local/bin/trino-cli.jar "$@"
+EOFWRAPPER
+    chmod +x /usr/local/bin/trino
+fi
+which java || (apt-get update && apt-get install -y default-jre-headless)
+"""
+    code, output = run_ssh_command(benchmark_ip, setup_cmd, timeout=120)
+    if code != 0:
+        return BenchmarkResult(error=f"Failed to setup trino CLI: {output}")
+
     # Get max ID for random lookups (query from benchmark VM)
     max_id_cmd = f"trino --server http://{trino_ip}:8080 --execute 'SELECT max(id) FROM iceberg.warehouse.benchmark' 2>/dev/null | tail -1"
     code, output = run_ssh_command(benchmark_ip, max_id_cmd, timeout=60)
-    if code != 0 or not output.strip().isdigit():
+    if code != 0 or not output.strip().replace('"', "").isdigit():
         return BenchmarkResult(error=f"Failed to get max ID: {output}")
-    max_id = int(output.strip())
+    max_id = int(output.strip().replace('"', ""))
 
     # Create benchmark script that connects to Trino over network
     bench_script = f"""

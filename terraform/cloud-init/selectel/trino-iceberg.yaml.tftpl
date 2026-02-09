@@ -1,36 +1,38 @@
 #cloud-config
-# Trino + Nessie + PostgreSQL setup for Iceberg benchmarking
-package_update: true
-package_upgrade: true
-
-packages:
-  - curl
-  - wget
-  - jq
-  - postgresql-16
-  - postgresql-client-16
-  - git
-  - python3
-  - python3-pip
-  - fio
-  - sysbench
+# Trino + Nessie + MinIO + PostgreSQL setup for Iceberg benchmarking
+# Stack: MinIO (S3) -> Nessie (catalog) -> Trino (query engine)
 
 write_files:
-  # PostgreSQL configuration for Nessie
-  - path: /etc/postgresql/16/main/conf.d/nessie.conf
+  # MinIO systemd service
+  - path: /etc/systemd/system/minio.service
     content: |
-      listen_addresses = 'localhost'
-      max_connections = 100
-      shared_buffers = 256MB
+      [Unit]
+      Description=MinIO Object Storage
+      After=network.target
+
+      [Service]
+      Type=simple
+      User=minio
+      Group=minio
+      Environment="MINIO_ROOT_USER=minioadmin"
+      Environment="MINIO_ROOT_PASSWORD=minioadmin"
+      ExecStart=/usr/local/bin/minio server /data/minio --console-address ":9001"
+      Restart=always
+      RestartSec=5
+      LimitNOFILE=65536
+
+      [Install]
+      WantedBy=multi-user.target
     permissions: '0644'
 
-  # Nessie systemd service
+  # Nessie systemd service (management port 9090 to avoid conflict with MinIO)
   - path: /etc/systemd/system/nessie.service
     content: |
       [Unit]
       Description=Nessie Catalog Server
-      After=network.target postgresql.service
+      After=network.target postgresql.service minio.service
       Requires=postgresql.service
+      Wants=minio.service
 
       [Service]
       Type=simple
@@ -40,6 +42,7 @@ write_files:
       Environment="QUARKUS_DATASOURCE_JDBC_URL=jdbc:postgresql://localhost:5432/nessie"
       Environment="QUARKUS_DATASOURCE_USERNAME=nessie"
       Environment="QUARKUS_DATASOURCE_PASSWORD=nessie"
+      Environment="QUARKUS_MANAGEMENT_PORT=9090"
       ExecStart=/opt/nessie/bin/nessie-quarkus-runner
       WorkingDirectory=/opt/nessie
       Restart=always
@@ -89,13 +92,19 @@ write_files:
       io.trino=INFO
     permissions: '0644'
 
-  # Iceberg catalog configuration
+  # Iceberg catalog configuration with MinIO (S3) backend
   - path: /etc/trino/catalog/iceberg.properties
     content: |
       connector.name=iceberg
       iceberg.catalog.type=nessie
       iceberg.nessie-catalog.uri=http://localhost:19120/api/v2
-      iceberg.nessie-catalog.default-warehouse-dir=/data/iceberg/warehouse
+      iceberg.nessie-catalog.default-warehouse-dir=s3://warehouse/
+      fs.native-s3.enabled=true
+      s3.endpoint=http://localhost:9000
+      s3.region=us-east-1
+      s3.path-style-access=true
+      s3.aws-access-key=minioadmin
+      s3.aws-secret-key=minioadmin
     permissions: '0644'
 
   # Trino systemd service
@@ -103,8 +112,8 @@ write_files:
     content: |
       [Unit]
       Description=Trino Server
-      After=network.target nessie.service
-      Wants=nessie.service
+      After=network.target nessie.service minio.service
+      Wants=nessie.service minio.service
 
       [Service]
       Type=forking
@@ -127,10 +136,73 @@ write_files:
       exec java -jar /opt/trino/trino-cli.jar --server localhost:8080 "$@"
     permissions: '0755'
 
+  # Trino installation script (separate file to avoid cloud-init variable issues)
+  - path: /opt/install-trino.sh
+    content: |
+      #!/bin/bash
+      set -e
+      cd /opt
+      TRINO_VERSION=467
+      TRINO_URL="https://repo1.maven.org/maven2/io/trino/trino-server/$TRINO_VERSION/trino-server-$TRINO_VERSION.tar.gz"
+      TRINO_CLI_URL="https://repo1.maven.org/maven2/io/trino/trino-cli/$TRINO_VERSION/trino-cli-$TRINO_VERSION-executable.jar"
+
+      echo "Downloading Trino server (~850MB)..."
+      for i in 1 2 3; do
+        if wget --progress=dot:giga -t 3 -c "$TRINO_URL" -O trino-server.tar.gz; then
+          break
+        fi
+        echo "Retry $i/3 for Trino download..."
+        sleep 10
+      done
+
+      echo "Extracting Trino..."
+      tar -xzf trino-server.tar.gz
+      mv trino-server-$TRINO_VERSION/* trino/
+      rm -rf trino-server-$TRINO_VERSION trino-server.tar.gz
+
+      echo "Downloading Trino CLI..."
+      wget -q -t 3 "$TRINO_CLI_URL" -O trino/trino-cli.jar
+
+      rm -rf /opt/trino/etc
+      ln -s /etc/trino /opt/trino/etc
+
+      chown -R trino:trino /opt/trino
+      echo "Trino installation complete"
+    permissions: '0755'
+
 runcmd:
-  # Install Temurin Java 22 (Trino 467+ requires Java 22+)
+  # Wait for DNS to be available (cloud-init may start before network is fully up)
   - |
-    wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor -o /usr/share/keyrings/adoptium.gpg
+    echo "Waiting for DNS resolution..."
+    for i in $(seq 1 30); do
+      if host mirror.selectel.ru > /dev/null 2>&1; then
+        echo "DNS is working"
+        break
+      fi
+      echo "Waiting for DNS... ($i/30)"
+      sleep 5
+    done
+
+  # Update package lists with retry
+  - |
+    for i in 1 2 3; do
+      if apt-get update; then
+        break
+      fi
+      echo "apt-get update failed, retrying ($i/3)..."
+      sleep 10
+    done
+
+  # Install base packages
+  - apt-get install -y curl wget jq git python3 python3-pip fio dnsutils
+
+  # Install PostgreSQL (Ubuntu 24.04 has postgresql-16 but package name is just postgresql)
+  - apt-get install -y postgresql postgresql-contrib
+
+  # Install Temurin Java 23 (Trino 467 requires Java 23+)
+  - |
+    curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public > /tmp/adoptium.key
+    gpg --batch --dearmor < /tmp/adoptium.key > /usr/share/keyrings/adoptium.gpg
     echo "deb [signed-by=/usr/share/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb $(lsb_release -cs) main" > /etc/apt/sources.list.d/adoptium.list
     apt-get update
     apt-get install -y temurin-23-jdk
@@ -149,21 +221,32 @@ runcmd:
     fi
 
   # Create directories
-  - mkdir -p /data/trino /data/iceberg/warehouse /data/nessie /opt/trino /opt/nessie
+  - mkdir -p /data/trino /data/minio /data/nessie /opt/trino /opt/nessie
 
   # Create users
   - useradd -r -s /bin/false -d /opt/trino trino
   - useradd -r -s /bin/false -d /opt/nessie nessie
+  - useradd -r -s /bin/false -d /data/minio minio
 
   # Set ownership
-  - chown -R trino:trino /data/trino /data/iceberg /opt/trino /etc/trino
+  - chown -R trino:trino /data/trino /opt/trino /etc/trino
   - chown -R nessie:nessie /data/nessie /opt/nessie
+  - chown -R minio:minio /data/minio
 
   # Setup PostgreSQL for Nessie
   - systemctl start postgresql
-  - sudo -u postgres psql -c "CREATE USER nessie WITH PASSWORD 'nessie';"
-  - sudo -u postgres psql -c "CREATE DATABASE nessie OWNER nessie;"
+  - sudo -u postgres psql -c "CREATE USER nessie WITH PASSWORD 'nessie';" || true
+  - sudo -u postgres psql -c "CREATE DATABASE nessie OWNER nessie;" || true
   - systemctl restart postgresql
+
+  # Download and install MinIO
+  - |
+    echo "Downloading MinIO..."
+    wget -q https://dl.min.io/server/minio/release/linux-amd64/minio -O /usr/local/bin/minio
+    chmod +x /usr/local/bin/minio
+    wget -q https://dl.min.io/client/mc/release/linux-amd64/mc -O /usr/local/bin/mc
+    chmod +x /usr/local/bin/mc
+    echo "MinIO installation complete"
 
   # Download and install Nessie
   - |
@@ -177,52 +260,39 @@ runcmd:
     chmod +x bin/nessie-quarkus-runner
     chown -R nessie:nessie /opt/nessie
 
-  # Download and install Trino (large ~850MB download, use retries)
-  - |
-    cd /opt
-    TRINO_VERSION=467
-    TRINO_URL="https://repo1.maven.org/maven2/io/trino/trino-server/$TRINO_VERSION/trino-server-$TRINO_VERSION.tar.gz"
-    TRINO_CLI_URL="https://repo1.maven.org/maven2/io/trino/trino-cli/$TRINO_VERSION/trino-cli-$TRINO_VERSION-executable.jar"
+  # Download and install Trino using external script
+  - /opt/install-trino.sh
 
-    echo "Downloading Trino server (~850MB)..."
-    for i in 1 2 3; do
-      if wget --progress=dot:giga -t 3 -c "$TRINO_URL" -O trino-server.tar.gz; then
-        break
-      fi
-      echo "Retry $i/3 for Trino download..."
-      sleep 10
-    done
-
-    echo "Extracting Trino..."
-    tar -xzf trino-server.tar.gz
-    mv trino-server-$TRINO_VERSION/* trino/
-    rm -rf trino-server-$TRINO_VERSION trino-server.tar.gz
-
-    # Download Trino CLI
-    echo "Downloading Trino CLI..."
-    wget -q -t 3 "$TRINO_CLI_URL" -O trino/trino-cli.jar
-
-    # Link config
-    rm -rf /opt/trino/etc
-    ln -s /etc/trino /opt/trino/etc
-
-    chown -R trino:trino /opt/trino
-    echo "Trino installation complete"
-
-  # Install Node.js and pnpm for samples-generation
+  # Install Node.js for samples-generation CLI
   - |
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
     apt-get install -y nodejs
-    npm install -g pnpm
 
-  # Start services
+  # Start services in order: MinIO -> Nessie -> Trino
   - systemctl daemon-reload
-  - systemctl enable nessie trino
+  - systemctl enable minio nessie trino
+  - systemctl start minio
+
+  # Wait for MinIO and create bucket
+  - |
+    for i in $(seq 1 30); do
+      if curl -sf http://localhost:9000/minio/health/live > /dev/null 2>&1; then
+        echo "MinIO is ready"
+        break
+      fi
+      echo "Waiting for MinIO... ($i/30)"
+      sleep 2
+    done
+    /usr/local/bin/mc alias set local http://localhost:9000 minioadmin minioadmin
+    /usr/local/bin/mc mb local/warehouse --ignore-existing
+    echo "MinIO bucket 'warehouse' created"
+
+  # Start Nessie
   - systemctl start nessie
 
   # Wait for Nessie
   - |
-    for i in {1..30}; do
+    for i in $(seq 1 30); do
       if curl -sf http://localhost:19120/api/v2/config > /dev/null 2>&1; then
         echo "Nessie is ready"
         break
@@ -236,7 +306,7 @@ runcmd:
 
   # Wait for Trino
   - |
-    for i in {1..60}; do
+    for i in $(seq 1 60); do
       if curl -sf http://localhost:8080/v1/info > /dev/null 2>&1; then
         echo "Trino is ready"
         break
