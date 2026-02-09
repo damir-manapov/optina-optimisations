@@ -1,0 +1,233 @@
+#cloud-config
+# Trino + Nessie + PostgreSQL setup for Iceberg benchmarking
+package_update: true
+package_upgrade: true
+
+packages:
+  - curl
+  - wget
+  - jq
+  - openjdk-21-jdk-headless
+  - postgresql-16
+  - postgresql-client-16
+  - git
+  - python3
+  - python3-pip
+  - fio
+  - sysbench
+
+write_files:
+  # PostgreSQL configuration for Nessie
+  - path: /etc/postgresql/16/main/conf.d/nessie.conf
+    content: |
+      listen_addresses = 'localhost'
+      max_connections = 100
+      shared_buffers = 256MB
+    permissions: '0644'
+
+  # Nessie systemd service
+  - path: /etc/systemd/system/nessie.service
+    content: |
+      [Unit]
+      Description=Nessie Catalog Server
+      After=network.target postgresql.service
+      Requires=postgresql.service
+
+      [Service]
+      Type=simple
+      User=nessie
+      Environment="JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64"
+      Environment="NESSIE_VERSION=0.99.0"
+      Environment="QUARKUS_DATASOURCE_JDBC_URL=jdbc:postgresql://localhost:5432/nessie"
+      Environment="QUARKUS_DATASOURCE_USERNAME=nessie"
+      Environment="QUARKUS_DATASOURCE_PASSWORD=nessie"
+      ExecStart=/opt/nessie/bin/nessie-quarkus-runner
+      WorkingDirectory=/opt/nessie
+      Restart=always
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+    permissions: '0644'
+
+  # Trino node.properties
+  - path: /etc/trino/node.properties
+    content: |
+      node.environment=benchmark
+      node.id=trino-1
+      node.data-dir=/data/trino
+    permissions: '0644'
+
+  # Trino JVM config
+  - path: /etc/trino/jvm.config
+    content: |
+      -server
+      -Xmx${floor(trino_ram_gb * 0.7 * 1024)}m
+      -Xms${floor(trino_ram_gb * 0.7 * 1024)}m
+      -XX:+UseG1GC
+      -XX:G1HeapRegionSize=32M
+      -XX:+ExplicitGCInvokesConcurrent
+      -XX:+HeapDumpOnOutOfMemoryError
+      -XX:ReservedCodeCacheSize=512M
+      -Djdk.attach.allowAttachSelf=true
+    permissions: '0644'
+
+  # Trino config.properties
+  - path: /etc/trino/config.properties
+    content: |
+      coordinator=true
+      node-scheduler.include-coordinator=true
+      http-server.http.port=8080
+      query.max-memory=${floor(trino_ram_gb * 0.4)}GB
+      query.max-memory-per-node=${floor(trino_ram_gb * 0.4)}GB
+      discovery.uri=http://localhost:8080
+      task.concurrency=16
+      task.writer-count=2
+    permissions: '0644'
+
+  # Trino log.properties
+  - path: /etc/trino/log.properties
+    content: |
+      io.trino=INFO
+    permissions: '0644'
+
+  # Iceberg catalog configuration
+  - path: /etc/trino/catalog/iceberg.properties
+    content: |
+      connector.name=iceberg
+      iceberg.catalog.type=nessie
+      iceberg.nessie-catalog.uri=http://localhost:19120/api/v2
+      iceberg.nessie-catalog.default-warehouse-dir=/data/iceberg/warehouse
+    permissions: '0644'
+
+  # Trino systemd service
+  - path: /etc/systemd/system/trino.service
+    content: |
+      [Unit]
+      Description=Trino Server
+      After=network.target nessie.service
+      Wants=nessie.service
+
+      [Service]
+      Type=forking
+      User=trino
+      Group=trino
+      Environment="JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64"
+      ExecStart=/opt/trino/bin/launcher start
+      ExecStop=/opt/trino/bin/launcher stop
+      Restart=on-failure
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+    permissions: '0644'
+
+  # Trino CLI wrapper
+  - path: /usr/local/bin/trino
+    content: |
+      #!/bin/bash
+      exec java -jar /opt/trino/trino-cli.jar --server localhost:8080 "$@"
+    permissions: '0755'
+
+runcmd:
+  # Format and mount data volume
+  - |
+    if [ -b /dev/vdb ]; then
+      mkfs.ext4 -F /dev/vdb
+      mkdir -p /data
+      mount /dev/vdb /data
+      echo '/dev/vdb /data ext4 defaults,nofail 0 2' >> /etc/fstab
+    else
+      mkdir -p /data
+    fi
+
+  # Create directories
+  - mkdir -p /data/trino /data/iceberg/warehouse /data/nessie /opt/trino /opt/nessie
+
+  # Create users
+  - useradd -r -s /bin/false -d /opt/trino trino
+  - useradd -r -s /bin/false -d /opt/nessie nessie
+
+  # Set ownership
+  - chown -R trino:trino /data/trino /data/iceberg /opt/trino /etc/trino
+  - chown -R nessie:nessie /data/nessie /opt/nessie
+
+  # Setup PostgreSQL for Nessie
+  - systemctl start postgresql
+  - sudo -u postgres psql -c "CREATE USER nessie WITH PASSWORD 'nessie';"
+  - sudo -u postgres psql -c "CREATE DATABASE nessie OWNER nessie;"
+  - systemctl restart postgresql
+
+  # Download and install Nessie
+  - |
+    cd /opt/nessie
+    wget -q https://github.com/projectnessie/nessie/releases/download/nessie-0.99.0/nessie-quarkus-0.99.0-runner.jar -O nessie-quarkus-runner.jar
+    mkdir -p bin
+    cat > bin/nessie-quarkus-runner << 'EOF'
+    #!/bin/bash
+    exec java -jar /opt/nessie/nessie-quarkus-runner.jar
+    EOF
+    chmod +x bin/nessie-quarkus-runner
+    chown -R nessie:nessie /opt/nessie
+
+  # Download and install Trino
+  - |
+    cd /opt
+    TRINO_VERSION=467
+    wget -q https://repo1.maven.org/maven2/io/trino/trino-server/$TRINO_VERSION/trino-server-$TRINO_VERSION.tar.gz
+    tar -xzf trino-server-$TRINO_VERSION.tar.gz
+    mv trino-server-$TRINO_VERSION/* trino/
+    rm -rf trino-server-$TRINO_VERSION trino-server-$TRINO_VERSION.tar.gz
+    
+    # Download Trino CLI
+    wget -q https://repo1.maven.org/maven2/io/trino/trino-cli/$TRINO_VERSION/trino-cli-$TRINO_VERSION-executable.jar -O trino/trino-cli.jar
+    
+    # Link config
+    rm -rf /opt/trino/etc
+    ln -s /etc/trino /opt/trino/etc
+    
+    chown -R trino:trino /opt/trino
+
+  # Install Node.js and pnpm for samples-generation
+  - |
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    apt-get install -y nodejs
+    npm install -g pnpm
+
+  # Start services
+  - systemctl daemon-reload
+  - systemctl enable nessie trino
+  - systemctl start nessie
+
+  # Wait for Nessie
+  - |
+    for i in {1..30}; do
+      if curl -sf http://localhost:19120/api/v2/config > /dev/null 2>&1; then
+        echo "Nessie is ready"
+        break
+      fi
+      echo "Waiting for Nessie... ($i/30)"
+      sleep 2
+    done
+
+  # Start Trino
+  - systemctl start trino
+
+  # Wait for Trino
+  - |
+    for i in {1..60}; do
+      if curl -sf http://localhost:8080/v1/info > /dev/null 2>&1; then
+        echo "Trino is ready"
+        break
+      fi
+      echo "Waiting for Trino... ($i/60)"
+      sleep 5
+    done
+
+  # Create Iceberg schema
+  - |
+    sleep 10
+    java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute "CREATE SCHEMA IF NOT EXISTS iceberg.warehouse" || true
+
+  # Signal ready
+  - touch /root/cloud-init-ready
