@@ -1,0 +1,46 @@
+[
+  {
+    "id": 1,
+    "trial": 0,
+    "timestamp": "2026-02-09T21:48:35.212116",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": "damir",
+    "config": {
+      "nodes": 2,
+      "cpu_per_node": 2,
+      "ram_per_node": 4,
+      "drives_per_node": 1,
+      "drive_size_gb": 200,
+      "drive_type": "basicssd"
+    },
+    "metrics": {
+      "total_mib_s": 408.71,
+      "get_mib_s": 350.83,
+      "put_mib_s": 59.69,
+      "duration_s": 117.87678289413452
+    },
+    "total_drives": 2,
+    "timings": {
+      "benchmark_s": 117.87712836265564,
+      "trial_total_s": 392.43339705467224,
+      "baseline_s": 59.1224262714386,
+      "terraform_s": 61.68859052658081,
+      "vm_ready_s": 13.853936195373535
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8870.512949,
+        "rand_write_iops": 3819.968003,
+        "rand_read_lat_ms": 0.445970710592,
+        "rand_write_lat_ms": 0.008135077951,
+        "seq_read_mib_s": 262.1943359375,
+        "seq_write_mib_s": 345.6083984375
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3584.43,
+        "mem_mib_per_sec": 25264.66
+      }
+    }
+  }
+]
