@@ -937,6 +937,7 @@ def objective_cluster(
     row_count: int,
     default_trino_config: dict,
     fixed_minio_config: dict | None = None,
+    fixed_trino_cluster_config: dict | None = None,
 ) -> float:
     """Objective function for cluster topology optimization.
 
@@ -954,6 +955,11 @@ def objective_cluster(
             - minio_cpu: int
             - minio_ram_gb: int
             - minio_disk_size_gb: int
+        fixed_trino_cluster_config: Optional fixed Trino cluster config with keys:
+            - trino_topology: "solo" or "cluster"
+            - trino_workers: int (cluster mode)
+            - trino_worker_cpu: int
+            - trino_worker_ram_gb: int
     """
     trial_start = time.time()
     timings = TrialTimings()
@@ -971,10 +977,13 @@ def objective_cluster(
         "disk_size_gb", infra_space["disk_size_gb"]
     )
 
-    # Sample Trino topology
-    trino_topology = trial.suggest_categorical(
-        "trino_topology", cluster_space["trino_topology"]
-    )
+    # Sample Trino topology (or use fixed config)
+    if fixed_trino_cluster_config and fixed_trino_cluster_config.get("trino_topology"):
+        trino_topology = fixed_trino_cluster_config["trino_topology"]
+    else:
+        trino_topology = trial.suggest_categorical(
+            "trino_topology", cluster_space["trino_topology"]
+        )
 
     cluster_config = {
         "trino_topology": trino_topology,
@@ -982,18 +991,36 @@ def objective_cluster(
 
     # Cluster-specific parameters
     if trino_topology == "cluster":
-        trino_workers = trial.suggest_categorical(
-            "trino_workers", cluster_space["trino_workers"]
-        )
-        trino_worker_cpu = trial.suggest_categorical(
-            "trino_worker_cpu", cluster_space["trino_worker_cpu"]
-        )
-        valid_worker_ram = filter_valid_ram(
-            cloud, trino_worker_cpu, cluster_space["trino_worker_ram_gb"]
-        )
-        trino_worker_ram_gb = trial.suggest_categorical(
-            f"trino_worker_ram_gb_cpu{trino_worker_cpu}", valid_worker_ram
-        )
+        if fixed_trino_cluster_config and fixed_trino_cluster_config.get(
+            "trino_workers"
+        ):
+            trino_workers = fixed_trino_cluster_config["trino_workers"]
+        else:
+            trino_workers = trial.suggest_categorical(
+                "trino_workers", cluster_space["trino_workers"]
+            )
+
+        if fixed_trino_cluster_config and fixed_trino_cluster_config.get(
+            "trino_worker_cpu"
+        ):
+            trino_worker_cpu = fixed_trino_cluster_config["trino_worker_cpu"]
+        else:
+            trino_worker_cpu = trial.suggest_categorical(
+                "trino_worker_cpu", cluster_space["trino_worker_cpu"]
+            )
+
+        if fixed_trino_cluster_config and fixed_trino_cluster_config.get(
+            "trino_worker_ram_gb"
+        ):
+            trino_worker_ram_gb = fixed_trino_cluster_config["trino_worker_ram_gb"]
+        else:
+            valid_worker_ram = filter_valid_ram(
+                cloud, trino_worker_cpu, cluster_space["trino_worker_ram_gb"]
+            )
+            trino_worker_ram_gb = trial.suggest_categorical(
+                f"trino_worker_ram_gb_cpu{trino_worker_cpu}", valid_worker_ram
+            )
+
         cluster_config.update(
             {
                 "trino_workers": trino_workers,
@@ -1471,6 +1498,32 @@ Examples:
     parser.add_argument(
         "--rows", type=int, default=DEFAULT_ROW_COUNT, help="Number of rows to generate"
     )
+    # Trino fixed config for cluster mode
+    trino_group = parser.add_argument_group("Trino cluster config (for cluster mode)")
+    trino_group.add_argument(
+        "--trino-topology",
+        choices=["solo", "cluster"],
+        default=None,
+        help="Trino topology: solo (all-in-one) or cluster (coordinator + workers)",
+    )
+    trino_group.add_argument(
+        "--trino-workers",
+        type=int,
+        default=None,
+        help="Number of Trino workers (cluster mode)",
+    )
+    trino_group.add_argument(
+        "--trino-worker-cpu",
+        type=int,
+        default=None,
+        help="Trino worker CPU per node",
+    )
+    trino_group.add_argument(
+        "--trino-worker-ram",
+        type=int,
+        default=None,
+        help="Trino worker RAM (GB) per node",
+    )
     # MinIO fixed config for cluster mode
     minio_group = parser.add_argument_group("MinIO config (for cluster mode)")
     minio_group.add_argument(
@@ -1560,6 +1613,24 @@ Examples:
                 n_trials=args.trials,
             )
         elif args.mode == "cluster":
+            # Build fixed Trino cluster config from CLI args (if any provided)
+            fixed_trino_cluster_config = None
+            if any(
+                [
+                    args.trino_topology,
+                    args.trino_workers,
+                    args.trino_worker_cpu,
+                    args.trino_worker_ram,
+                ]
+            ):
+                fixed_trino_cluster_config = {
+                    "trino_topology": args.trino_topology,
+                    "trino_workers": args.trino_workers,
+                    "trino_worker_cpu": args.trino_worker_cpu,
+                    "trino_worker_ram_gb": args.trino_worker_ram,
+                }
+                print(f"Fixed Trino cluster config: {fixed_trino_cluster_config}")
+
             # Build fixed MinIO config from CLI args (if any provided)
             fixed_minio_config = None
             if any(
@@ -1594,6 +1665,7 @@ Examples:
                     args.rows,
                     get_default_trino_config(),
                     fixed_minio_config,
+                    fixed_trino_cluster_config,
                 ),
                 n_trials=args.trials,
             )
@@ -1639,6 +1711,23 @@ Examples:
                 load_if_exists=True,
             )
             # Use same fixed_minio_config logic as cluster mode
+            fixed_trino_cluster_config = None
+            if any(
+                [
+                    args.trino_topology,
+                    args.trino_workers,
+                    args.trino_worker_cpu,
+                    args.trino_worker_ram,
+                ]
+            ):
+                fixed_trino_cluster_config = {
+                    "trino_topology": args.trino_topology,
+                    "trino_workers": args.trino_workers,
+                    "trino_worker_cpu": args.trino_worker_cpu,
+                    "trino_worker_ram_gb": args.trino_worker_ram,
+                }
+                print(f"Fixed Trino cluster config: {fixed_trino_cluster_config}")
+
             fixed_minio_config = None
             if any(
                 [
@@ -1671,6 +1760,7 @@ Examples:
                     args.rows,
                     get_default_trino_config(),
                     fixed_minio_config,
+                    fixed_trino_cluster_config,
                 ),
                 n_trials=args.trials // 2,
             )
