@@ -40,24 +40,30 @@ uv run python optimizers/postgres/optimizer.py --cloud timeweb --show-results
 
 ### Infrastructure (--mode infra)
 
-| Parameter    | Values                  | Notes       |
-| ------------ | ----------------------- | ----------- |
-| mode         | single, cluster         | Topology    |
-| cpu          | 2, 4, 8, 16             | vCPU        |
-| ram_gb       | 4, 8, 16, 32, 64        | GB          |
-| disk_type    | fast, universal, basic  | Disk tier   |
-| disk_size_gb | 50, 100, 200            | Disk size   |
+| Parameter    | Values                           | Notes                |
+| ------------ | -------------------------------- | -------------------- |
+| mode         | single, cluster                  | Topology             |
+| cpu          | 2, 4, 8, 16                      | vCPU                 |
+| ram_gb       | 4, 8, 16, 32, 64                 | GB                   |
+| disk_type    | nvme (timeweb) / fast (selectel) | Cloud-specific       |
+| disk_size_gb | 50, 100, 200                     | Disk size            |
 
 ### PostgreSQL Config (--mode config)
 
-| Parameter                       | Values                  | Notes                       |
-| ------------------------------- | ----------------------- | --------------------------- |
-| shared_buffers_pct              | 15, 20, 25, 30, 35, 40  | % of RAM                    |
-| effective_cache_size_pct        | 50, 60, 70, 75          | % of RAM                    |
-| work_mem_mb                     | 4, 16, 32, 64, 128, 256 | Per-operation memory        |
-| max_connections                 | 50, 100, 200, 500       | Max connections             |
-| random_page_cost                | 1.1, 1.5, 2.0, 4.0      | Random I/O cost             |
-| max_parallel_workers_per_gather | 0, 2, 4                 | Parallel query workers      |
+| Parameter                       | Values                     | Notes                  |
+| ------------------------------- | -------------------------- | ---------------------- |
+| shared_buffers_pct              | 15, 20, 25, 30, 35, 40     | % of RAM               |
+| effective_cache_size_pct        | 50, 60, 70, 75             | % of RAM               |
+| work_mem_mb                     | 4, 16, 32, 64, 128, 256    | Per-operation memory   |
+| maintenance_work_mem_mb         | 64, 128, 256, 512, 1024    | VACUUM/CREATE INDEX    |
+| max_connections                 | 50, 100, 200, 500          | Max connections        |
+| random_page_cost                | 1.1, 1.5, 2.0, 4.0         | Random I/O cost        |
+| effective_io_concurrency        | 1, 50, 100, 200            | Async I/O operations   |
+| wal_buffers_mb                  | 16, 32, 64, 128            | WAL buffer size        |
+| max_wal_size_gb                 | 1, 2, 4, 8                 | Max WAL size           |
+| checkpoint_completion_target    | 0.5, 0.7, 0.9              | Checkpoint spread      |
+| max_worker_processes            | 2, 4, 8                    | Background workers     |
+| max_parallel_workers_per_gather | 0, 1, 2, 4                 | Parallel query workers |
 
 ## Metrics
 

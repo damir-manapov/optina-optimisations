@@ -20,7 +20,7 @@ uv run python optimizers/minio/optimizer.py --cloud selectel --export-md
 
 | Parameter       | Values                                       | Notes                 |
 | --------------- | -------------------------------------------- | --------------------- |
-| nodes           | 1, 2, 4                                      | Number of MinIO nodes |
+| nodes           | 1, 2, 3, 4                                   | Number of MinIO nodes |
 | cpu_per_node    | 2, 4, 8                                      | vCPU per node         |
 | ram_per_node    | 4, 8, 16, 32                                 | GB per node           |
 | drives_per_node | 1, 2, 4                                      | Drives per node       |

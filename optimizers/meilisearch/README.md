@@ -33,11 +33,11 @@ uv run python optimizers/meilisearch/optimizer.py --cloud selectel --show-result
 
 ### Infrastructure (--mode infra)
 
-| Parameter | Values                 | Notes     |
-| --------- | ---------------------- | --------- |
-| cpu       | 2, 4, 8, 16            | vCPU      |
-| ram_gb    | 4, 8, 16, 32           | GB        |
-| disk_type | fast, universal, basic | Disk tier |
+| Parameter | Values                                       | Notes     |
+| --------- | -------------------------------------------- | --------- |
+| cpu       | 2, 4, 8, 16, 32                              | vCPU      |
+| ram_gb    | 4, 8, 16, 32, 64                             | GB        |
+| disk_type | fast, universal2, universal, basicssd, basic | Disk tier |
 
 ### Meilisearch Config (--mode config)
 
