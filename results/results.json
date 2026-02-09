@@ -306,5 +306,210 @@
         "mem_mib_per_sec": 24375.21
       }
     }
+  },
+  {
+    "id": 8,
+    "trial": 8,
+    "timestamp": "2026-02-09T23:08:51.860007",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "config": {
+      "nodes": 3,
+      "cpu_per_node": 4,
+      "ram_per_node": 4,
+      "drives_per_node": 3,
+      "drive_size_gb": 100,
+      "drive_type": "universal"
+    },
+    "metrics": {
+      "total_mib_s": 410.3,
+      "get_mib_s": 352.25,
+      "put_mib_s": 59.21,
+      "duration_s": 116.9896969795227
+    },
+    "total_drives": 9,
+    "timings": {
+      "benchmark_s": 116.98976135253906,
+      "trial_total_s": 395.1521797180176,
+      "baseline_s": 57.05456805229187,
+      "terraform_s": 91.98470330238342,
+      "vm_ready_s": 1.430511474609375e-06
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8608.619569,
+        "rand_write_iops": 3710.714464,
+        "rand_read_lat_ms": 0.45953110961099997,
+        "rand_write_lat_ms": 0.008464305909999999,
+        "seq_read_mib_s": 264.220703125,
+        "seq_write_mib_s": 346.142578125
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3537.63,
+        "mem_mib_per_sec": 25227.69
+      }
+    }
+  },
+  {
+    "id": 9,
+    "trial": 9,
+    "timestamp": "2026-02-09T23:15:29.271387",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "config": {
+      "nodes": 3,
+      "cpu_per_node": 2,
+      "ram_per_node": 8,
+      "drives_per_node": 2,
+      "drive_size_gb": 100,
+      "drive_type": "universal"
+    },
+    "metrics": {
+      "total_mib_s": 409.94,
+      "get_mib_s": 352.13,
+      "put_mib_s": 59.98,
+      "duration_s": 115.95371770858765
+    },
+    "total_drives": 6,
+    "timings": {
+      "benchmark_s": 115.95382285118103,
+      "trial_total_s": 397.3713285923004,
+      "baseline_s": 56.494213581085205,
+      "terraform_s": 90.25315141677856,
+      "vm_ready_s": 18.06031847000122
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8874.306285,
+        "rand_write_iops": 3821.858907,
+        "rand_read_lat_ms": 0.445601779414,
+        "rand_write_lat_ms": 0.008400200115,
+        "seq_read_mib_s": 266.56640625,
+        "seq_write_mib_s": 344.3134765625
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3566.55,
+        "mem_mib_per_sec": 24392.59
+      }
+    }
+  },
+  {
+    "id": 10,
+    "trial": 10,
+    "timestamp": "2026-02-09T23:22:03.221159",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "config": {
+      "nodes": 3,
+      "cpu_per_node": 4,
+      "ram_per_node": 32,
+      "drives_per_node": 3,
+      "drive_size_gb": 100,
+      "drive_type": "universal"
+    },
+    "metrics": {
+      "total_mib_s": 408.96,
+      "get_mib_s": 351.36,
+      "put_mib_s": 59.86,
+      "duration_s": 117.4629967212677
+    },
+    "total_drives": 9,
+    "timings": {
+      "benchmark_s": 117.46305584907532,
+      "trial_total_s": 393.9093532562256,
+      "baseline_s": 56.82789754867554,
+      "terraform_s": 72.63006114959717,
+      "vm_ready_s": 1.430511474609375e-06
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8491.375431,
+        "rand_write_iops": 3661.716914,
+        "rand_read_lat_ms": 0.46561583918,
+        "rand_write_lat_ms": 0.009005674145000002,
+        "seq_read_mib_s": 265.6669921875,
+        "seq_write_mib_s": 394.47265625
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3583.93,
+        "mem_mib_per_sec": 25551.45
+      }
+    }
+  },
+  {
+    "id": 11,
+    "trial": 21,
+    "timestamp": "2026-02-09T23:38:17.184564",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "config": {
+      "nodes": 4,
+      "cpu_per_node": 8,
+      "ram_per_node": 8,
+      "drives_per_node": 3,
+      "drive_size_gb": 100,
+      "drive_type": "universal"
+    },
+    "metrics": {
+      "total_mib_s": 0.0,
+      "get_mib_s": 0.0,
+      "put_mib_s": 0.0,
+      "duration_s": 0.0
+    },
+    "total_drives": 12,
+    "error": "Benchmark failed",
+    "timings": {
+      "benchmark_s": 3.371757984161377,
+      "trial_total_s": 234.10262322425842,
+      "baseline_s": 56.617976665496826,
+      "terraform_s": 88.0356559753418,
+      "vm_ready_s": 1.6689300537109375e-06
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8731.313434,
+        "rand_write_iops": 3760.011999,
+        "rand_read_lat_ms": 0.453070984156,
+        "rand_write_lat_ms": 0.008662234123,
+        "seq_read_mib_s": 269.19140625,
+        "seq_write_mib_s": 341.0380859375
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3584.44,
+        "mem_mib_per_sec": 24040.27
+      }
+    }
+  },
+  {
+    "id": 22,
+    "trial": 22,
+    "timestamp": "2026-02-09T23:39:34.240571",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "config": {
+      "nodes": 3,
+      "cpu_per_node": 4,
+      "ram_per_node": 16,
+      "drives_per_node": 3,
+      "drive_size_gb": 100,
+      "drive_type": "fast"
+    },
+    "metrics": {
+      "total_mib_s": 0.0,
+      "get_mib_s": 0.0,
+      "put_mib_s": 0.0,
+      "duration_s": 0.0
+    },
+    "total_drives": 9,
+    "error": "Deploy failed",
+    "timings": {
+      "trial_total_s": 77.02015709877014,
+      "terraform_s": 7.9400928020477295
+    }
   }
 ]
