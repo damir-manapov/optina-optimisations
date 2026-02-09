@@ -936,6 +936,7 @@ def objective_cluster(
     login: str,
     row_count: int,
     default_trino_config: dict,
+    fixed_minio_config: dict | None = None,
 ) -> float:
     """Objective function for cluster topology optimization.
 
@@ -944,6 +945,15 @@ def objective_cluster(
     - Number of Trino workers
     - Worker VM specs
     - External MinIO cluster vs local
+
+    Args:
+        fixed_minio_config: Optional fixed MinIO config dict with keys:
+            - minio_enabled: bool
+            - minio_topology: "solo" or "cluster"
+            - minio_nodes: int (4+ for cluster)
+            - minio_cpu: int
+            - minio_ram_gb: int
+            - minio_disk_size_gb: int
     """
     trial_start = time.time()
     timings = TrialTimings()
@@ -992,30 +1002,55 @@ def objective_cluster(
             }
         )
 
-    # Sample MinIO topology
-    minio_enabled = trial.suggest_categorical(
-        "minio_enabled", cluster_space["minio_enabled"]
-    )
+    # Sample MinIO topology (or use fixed config)
+    if fixed_minio_config and fixed_minio_config.get("minio_enabled") is not None:
+        minio_enabled = fixed_minio_config["minio_enabled"]
+    else:
+        minio_enabled = trial.suggest_categorical(
+            "minio_enabled", cluster_space["minio_enabled"]
+        )
     cluster_config["minio_enabled"] = minio_enabled
 
     if minio_enabled:
-        minio_topology = trial.suggest_categorical(
-            "minio_topology", cluster_space["minio_topology"]
-        )
-        # Only sample nodes for cluster mode (solo always uses 1 node)
-        if minio_topology == "cluster":
+        # Use fixed config values if provided, otherwise sample
+        if fixed_minio_config and fixed_minio_config.get("minio_topology"):
+            minio_topology = fixed_minio_config["minio_topology"]
+        else:
+            minio_topology = trial.suggest_categorical(
+                "minio_topology", cluster_space["minio_topology"]
+            )
+
+        # Get nodes: fixed, sampled (for cluster), or 1 (for solo)
+        if fixed_minio_config and fixed_minio_config.get("minio_nodes"):
+            minio_nodes = fixed_minio_config["minio_nodes"]
+        elif minio_topology == "cluster":
             minio_nodes = trial.suggest_categorical(
                 "minio_nodes", cluster_space["minio_nodes"]
             )
         else:
             minio_nodes = 1
-        minio_cpu = trial.suggest_categorical("minio_cpu", cluster_space["minio_cpu"])
-        minio_ram_gb = trial.suggest_categorical(
-            "minio_ram_gb", cluster_space["minio_ram_gb"]
-        )
-        minio_disk_size_gb = trial.suggest_categorical(
-            "minio_disk_size_gb", cluster_space["minio_disk_size_gb"]
-        )
+
+        if fixed_minio_config and fixed_minio_config.get("minio_cpu"):
+            minio_cpu = fixed_minio_config["minio_cpu"]
+        else:
+            minio_cpu = trial.suggest_categorical(
+                "minio_cpu", cluster_space["minio_cpu"]
+            )
+
+        if fixed_minio_config and fixed_minio_config.get("minio_ram_gb"):
+            minio_ram_gb = fixed_minio_config["minio_ram_gb"]
+        else:
+            minio_ram_gb = trial.suggest_categorical(
+                "minio_ram_gb", cluster_space["minio_ram_gb"]
+            )
+
+        if fixed_minio_config and fixed_minio_config.get("minio_disk_size_gb"):
+            minio_disk_size_gb = fixed_minio_config["minio_disk_size_gb"]
+        else:
+            minio_disk_size_gb = trial.suggest_categorical(
+                "minio_disk_size_gb", cluster_space["minio_disk_size_gb"]
+            )
+
         cluster_config.update(
             {
                 "minio_topology": minio_topology,
@@ -1432,9 +1467,47 @@ Examples:
         ram_default=16,
         with_benchmark_vm=False,  # Benchmark runs on same VM
     )
-    # Add trino-iceberg specific argument
+    # Add trino-iceberg specific arguments
     parser.add_argument(
         "--rows", type=int, default=DEFAULT_ROW_COUNT, help="Number of rows to generate"
+    )
+    # MinIO fixed config for cluster mode
+    minio_group = parser.add_argument_group("MinIO config (for cluster mode)")
+    minio_group.add_argument(
+        "--minio-enabled",
+        action="store_true",
+        default=None,
+        help="Use external MinIO (default: sampled in cluster mode)",
+    )
+    minio_group.add_argument(
+        "--minio-topology",
+        choices=["solo", "cluster"],
+        default=None,
+        help="MinIO topology: solo (1 node) or cluster (distributed)",
+    )
+    minio_group.add_argument(
+        "--minio-nodes",
+        type=int,
+        default=None,
+        help="Number of MinIO nodes (4+ for cluster mode)",
+    )
+    minio_group.add_argument(
+        "--minio-cpu",
+        type=int,
+        default=None,
+        help="MinIO CPU per node",
+    )
+    minio_group.add_argument(
+        "--minio-ram",
+        type=int,
+        default=None,
+        help="MinIO RAM (GB) per node",
+    )
+    minio_group.add_argument(
+        "--minio-disk",
+        type=int,
+        default=None,
+        help="MinIO disk (GB) per node",
     )
     args = parser.parse_args()
 
@@ -1487,6 +1560,30 @@ Examples:
                 n_trials=args.trials,
             )
         elif args.mode == "cluster":
+            # Build fixed MinIO config from CLI args (if any provided)
+            fixed_minio_config = None
+            if any(
+                [
+                    args.minio_enabled is not None,
+                    args.minio_topology,
+                    args.minio_nodes,
+                    args.minio_cpu,
+                    args.minio_ram,
+                    args.minio_disk,
+                ]
+            ):
+                fixed_minio_config = {
+                    "minio_enabled": args.minio_enabled
+                    if args.minio_enabled is not None
+                    else True,
+                    "minio_topology": args.minio_topology,
+                    "minio_nodes": args.minio_nodes,
+                    "minio_cpu": args.minio_cpu,
+                    "minio_ram_gb": args.minio_ram,
+                    "minio_disk_size_gb": args.minio_disk,
+                }
+                print(f"Fixed MinIO config: {fixed_minio_config}")
+
             # Cluster topology optimization
             study.optimize(
                 lambda t: objective_cluster(
@@ -1496,6 +1593,7 @@ Examples:
                     args.login,
                     args.rows,
                     get_default_trino_config(),
+                    fixed_minio_config,
                 ),
                 n_trials=args.trials,
             )
@@ -1540,6 +1638,30 @@ Examples:
                 sampler=TPESampler(),
                 load_if_exists=True,
             )
+            # Use same fixed_minio_config logic as cluster mode
+            fixed_minio_config = None
+            if any(
+                [
+                    args.minio_enabled is not None,
+                    args.minio_topology,
+                    args.minio_nodes,
+                    args.minio_cpu,
+                    args.minio_ram,
+                    args.minio_disk,
+                ]
+            ):
+                fixed_minio_config = {
+                    "minio_enabled": args.minio_enabled
+                    if args.minio_enabled is not None
+                    else True,
+                    "minio_topology": args.minio_topology,
+                    "minio_nodes": args.minio_nodes,
+                    "minio_cpu": args.minio_cpu,
+                    "minio_ram_gb": args.minio_ram,
+                    "minio_disk_size_gb": args.minio_disk,
+                }
+                print(f"Fixed MinIO config: {fixed_minio_config}")
+
             study_cluster.optimize(
                 lambda t: objective_cluster(
                     t,
@@ -1548,6 +1670,7 @@ Examples:
                     args.login,
                     args.rows,
                     get_default_trino_config(),
+                    fixed_minio_config,
                 ),
                 n_trials=args.trials // 2,
             )
