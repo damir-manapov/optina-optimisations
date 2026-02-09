@@ -227,10 +227,20 @@ class MemtierResult:
 
 
 @dataclass
+class DeployTimings:
+    """Timing breakdown for deploy phase."""
+
+    terraform_s: float = 0.0  # Terraform apply
+    vm_ready_s: float = 0.0  # Wait for VM cloud-init (N/A for Redis - uses benchmark VM)
+    service_ready_s: float = 0.0  # Wait for service health
+
+
+@dataclass
 class TrialTimings:
     """Timing measurements for each phase of a trial."""
 
     terraform_s: float = 0.0  # Terraform apply
+    vm_ready_s: float = 0.0  # Wait for VM cloud-init
     service_ready_s: float = 0.0  # Wait for Redis to be ready
     benchmark_s: float = 0.0  # memtier benchmark
     destroy_s: float = 0.0  # Terraform destroy
@@ -393,16 +403,36 @@ def load_historical_trials(study: optuna.Study, cloud: str, metric: str) -> int:
 
 def wait_for_redis_ready(
     vm_ip: str, redis_ip: str = "10.0.0.20", timeout: int = 180
-) -> bool:
-    """Wait for Redis to be ready."""
+) -> tuple[bool, float, float]:
+    """Wait for Redis to be ready. Returns (success, vm_ready_s, service_ready_s)."""
     clear_known_hosts_on_vm(vm_ip)
 
     print(f"  Waiting for Redis at {redis_ip} to be ready...")
 
     start = time.time()
+    vm_ready_time = 0.0
+    ssh_ready = False
+
     while time.time() - start < timeout:
         elapsed = time.time() - start
         try:
+            if not ssh_ready:
+                # First check SSH connectivity
+                ssh_cmd = (
+                    f"ssh -A -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@{redis_ip} "
+                    f"'echo ok'"
+                )
+                code, _ = run_ssh_command(vm_ip, ssh_cmd, timeout=15, forward_agent=True)
+                if code == 0:
+                    vm_ready_time = elapsed
+                    ssh_ready = True
+                    print(f"  SSH to Redis node available ({elapsed:.0f}s)")
+                else:
+                    print(f"  Waiting for SSH ({elapsed:.0f}s)...")
+                    time.sleep(10)
+                    continue
+
+            # Check cloud-init complete and redis ready
             check_cmd = (
                 f"ssh -A -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@{redis_ip} "
                 f"'test -f /root/cloud-init-ready && redis-cli ping'"
@@ -411,8 +441,9 @@ def wait_for_redis_ready(
                 vm_ip, check_cmd, timeout=20, forward_agent=True
             )
             if code == 0 and "PONG" in output:
+                service_ready_time = elapsed - vm_ready_time
                 print(f"  Redis is ready! ({elapsed:.0f}s)")
-                return True
+                return True, vm_ready_time, service_ready_time
             else:
                 print(f"  Redis not ready yet ({elapsed:.0f}s)...")
         except Exception as e:
@@ -420,7 +451,7 @@ def wait_for_redis_ready(
         time.sleep(10)
 
     print(f"  Warning: Redis not ready after {timeout}s")
-    return False
+    return False, time.time() - start, 0.0
 
 
 def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
@@ -475,10 +506,11 @@ def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
 
 def deploy_redis(
     config: dict, cloud_config: CloudConfig, vm_ip: str
-) -> tuple[bool, float]:
-    """Deploy Redis with given configuration."""
+) -> tuple[bool, DeployTimings]:
+    """Deploy Redis with given configuration. Returns (success, timings)."""
     print(f"  Deploying Redis on {cloud_config.name}: {config}")
-    start = time.time()
+    timings = DeployTimings()
+    tf_start = time.time()
 
     tf = get_terraform(cloud_config.terraform_dir)
 
@@ -494,17 +526,22 @@ def deploy_redis(
     }
 
     ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
+    timings.terraform_s = time.time() - tf_start
 
     if ret_code != 0:
         print(f"  Terraform apply failed: {stderr}")
-        return False, time.time() - start
+        return False, timings
 
-    if not wait_for_redis_ready(vm_ip):
+    ready, vm_ready_s, service_ready_s = wait_for_redis_ready(vm_ip)
+    timings.vm_ready_s = vm_ready_s
+    timings.service_ready_s = service_ready_s
+
+    if not ready:
         print("  Warning: Redis may not be fully ready")
 
-    duration = time.time() - start
-    print(f"  Redis deployed in {duration:.1f}s")
-    return True, duration
+    total = timings.terraform_s + timings.vm_ready_s + timings.service_ready_s
+    print(f"  Redis deployed in {total:.1f}s (tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s)")
+    return True, timings
 
 
 def destroy_redis(cloud_config: CloudConfig) -> tuple[bool, float]:
@@ -623,6 +660,7 @@ def save_result(
     if result.timings:
         timings_dict = {
             "terraform_s": result.timings.terraform_s,
+            "vm_ready_s": result.timings.vm_ready_s,
             "service_ready_s": result.timings.service_ready_s,
             "benchmark_s": result.timings.benchmark_s,
             "destroy_s": result.timings.destroy_s,
@@ -710,8 +748,10 @@ def objective(
     time.sleep(10)
 
     # Deploy Redis
-    success, deploy_time = deploy_redis(config, cloud_config, vm_ip)
-    timings.terraform_s = deploy_time
+    success, deploy_timings = deploy_redis(config, cloud_config, vm_ip)
+    timings.terraform_s = deploy_timings.terraform_s
+    timings.vm_ready_s = deploy_timings.vm_ready_s
+    timings.service_ready_s = deploy_timings.service_ready_s
     if not success:
         print("  Deploy failed - marking trial as pruned (will retry config later)")
         raise optuna.TrialPruned("Deploy failed")
@@ -743,7 +783,7 @@ def objective(
         f"  Result: {result.ops_per_sec:.0f} ops/s, p99={result.p99_latency_ms:.2f}ms, Cost: {cost:.2f}/hr"
     )
     print(
-        f"  Timings: destroy={timings.destroy_s:.0f}s, deploy={timings.terraform_s:.0f}s, bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
+        f"  Timings: destroy={timings.destroy_s:.0f}s, tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s, bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
     )
 
     return metric_value

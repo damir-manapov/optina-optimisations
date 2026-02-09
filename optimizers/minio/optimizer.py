@@ -255,10 +255,20 @@ class SystemBaseline:
 
 
 @dataclass
+class DeployTimings:
+    """Timing breakdown for deploy phase."""
+
+    terraform_s: float = 0.0  # Terraform apply
+    vm_ready_s: float = 0.0  # Wait for VM cloud-init
+    service_ready_s: float = 0.0  # Wait for service health
+
+
+@dataclass
 class TrialTimings:
     """Timing measurements for each phase of a trial."""
 
     terraform_s: float = 0.0  # Terraform create MinIO cluster
+    vm_ready_s: float = 0.0  # Wait for VM cloud-init
     service_ready_s: float = 0.0  # Wait for MinIO to be ready
     baseline_s: float = 0.0  # fio + sysbench tests
     benchmark_s: float = 0.0  # warp benchmark
@@ -439,10 +449,11 @@ def load_historical_trials(study: optuna.Study, cloud: str, metric: str) -> int:
 
 def wait_for_minio_ready(
     vm_ip: str, minio_ip: str = "10.0.0.10", timeout: int = 300
-) -> bool:
+) -> tuple[bool, float, float]:
     """Wait for MinIO to be ready (cloud-init complete and service responding).
 
     Uses SSH agent forwarding to check MinIO node via benchmark VM.
+    Returns (success, vm_ready_s, service_ready_s).
     """
     # Clear stale known_hosts to avoid host key change errors
     clear_known_hosts_on_vm(vm_ip)
@@ -451,6 +462,7 @@ def wait_for_minio_ready(
 
     start = time.time()
     ssh_ready = False
+    vm_ready_time = 0.0
 
     while time.time() - start < timeout:
         elapsed = time.time() - start
@@ -465,6 +477,7 @@ def wait_for_minio_ready(
                     vm_ip, ssh_cmd, timeout=15, forward_agent=True
                 )
                 if code == 0:
+                    vm_ready_time = elapsed
                     print(f"  SSH to MinIO node available ({elapsed:.0f}s)")
                     ssh_ready = True
                 else:
@@ -481,8 +494,9 @@ def wait_for_minio_ready(
                 vm_ip, check_cmd, timeout=20, forward_agent=True
             )
             if code == 0:
+                service_ready_time = elapsed - vm_ready_time
                 print(f"  MinIO is ready! ({elapsed:.0f}s)")
-                return True
+                return True, vm_ready_time, service_ready_time
             else:
                 print(f"  MinIO not ready yet ({elapsed:.0f}s)...")
         except Exception as e:
@@ -490,7 +504,7 @@ def wait_for_minio_ready(
         time.sleep(10)
 
     print(f"  Warning: MinIO not ready after {timeout}s, continuing anyway...")
-    return False
+    return False, time.time() - start, 0.0
 
 
 def terraform_refresh_and_validate(tf) -> bool:
@@ -583,7 +597,7 @@ def is_ip_conflict_error(stderr: str | None) -> bool:
 def deploy_minio(
     config: dict, cloud_config: CloudConfig, vm_ip: str, max_retries: int = 3
 ) -> tuple[bool, float]:
-    """Deploy MinIO cluster with given configuration. Returns (success, duration_s).
+    """Deploy MinIO cluster with given configuration. Returns (success, timings).
 
     Args:
         config: MinIO configuration dict
@@ -592,7 +606,8 @@ def deploy_minio(
         max_retries: Number of retries for transient errors
     """
     print(f"  Deploying MinIO on {cloud_config.name}: {config}")
-    start = time.time()
+    timings = DeployTimings()
+    tf_start = time.time()
 
     tf = get_terraform(cloud_config.terraform_dir)
 
@@ -634,19 +649,26 @@ def deploy_minio(
 
         # Unknown error
         print(f"  Terraform apply failed: {stderr}")
-        return False, time.time() - start
+        timings.terraform_s = time.time() - tf_start
+        return False, timings
+
+    timings.terraform_s = time.time() - tf_start
 
     if ret_code != 0:
         print(f"  Terraform apply failed after {max_retries} retries: {stderr}")
-        return False, time.time() - start
+        return False, timings
 
     # Wait for MinIO to be ready (cloud-init + service health check)
-    if not wait_for_minio_ready(vm_ip):
+    ready, vm_ready_s, service_ready_s = wait_for_minio_ready(vm_ip)
+    timings.vm_ready_s = vm_ready_s
+    timings.service_ready_s = service_ready_s
+
+    if not ready:
         print("  Warning: MinIO may not be fully ready")
 
-    duration = time.time() - start
-    print(f"  MinIO deployed in {duration:.1f}s")
-    return True, duration
+    total = timings.terraform_s + timings.vm_ready_s + timings.service_ready_s
+    print(f"  MinIO deployed in {total:.1f}s (tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s)")
+    return True, timings
 
 
 def destroy_minio(cloud_config: CloudConfig) -> tuple[bool, float]:
@@ -983,6 +1005,7 @@ def save_result(
     if result.timings:
         timings_metrics = {
             "terraform_s": result.timings.terraform_s,
+            "vm_ready_s": result.timings.vm_ready_s,
             "service_ready_s": result.timings.service_ready_s,
             "baseline_s": result.timings.baseline_s,
             "benchmark_s": result.timings.benchmark_s,
@@ -1072,8 +1095,10 @@ def objective(
     time.sleep(post_destroy_wait)
 
     # Deploy MinIO
-    success, deploy_time = deploy_minio(config, cloud_config, vm_ip)
-    timings.terraform_s = deploy_time
+    success, deploy_timings = deploy_minio(config, cloud_config, vm_ip)
+    timings.terraform_s = deploy_timings.terraform_s
+    timings.vm_ready_s = deploy_timings.vm_ready_s
+    timings.service_ready_s = deploy_timings.service_ready_s
     if not success:
         timings.trial_total_s = time.time() - trial_start
         save_result(
@@ -1136,7 +1161,7 @@ def objective(
         f"  Result: {result.total_mib_s:.1f} MiB/s, Cost: {cost:.2f}/hr, {metric}={metric_value:.2f}"
     )
     print(
-        f"  Timings: deploy={timings.terraform_s:.0f}s, baseline={timings.baseline_s:.0f}s, benchmark={timings.benchmark_s:.0f}s, destroy={timings.destroy_s:.0f}s, total={timings.trial_total_s:.0f}s"
+        f"  Timings: tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s, baseline={timings.baseline_s:.0f}s, bench={timings.benchmark_s:.0f}s, destroy={timings.destroy_s:.0f}s, total={timings.trial_total_s:.0f}s"
     )
 
     return metric_value

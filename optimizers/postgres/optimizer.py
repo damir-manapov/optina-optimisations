@@ -78,6 +78,15 @@ class Mode(Enum):
 
 
 @dataclass
+class InfraTimings:
+    """Timing breakdown for infrastructure creation."""
+
+    terraform_s: float = 0.0  # Terraform apply
+    vm_ready_s: float = 0.0  # Wait for VM cloud-init
+    service_ready_s: float = 0.0  # Wait for service health
+
+
+@dataclass
 class TrialTimings:
     """Timing measurements for each phase of a trial."""
 
@@ -418,8 +427,9 @@ def reconfigure_patroni(
 def ensure_infra(
     cloud_config: CloudConfig, infra_config: dict | None = None
 ) -> tuple[str, str]:
-    """Ensure Postgres and Benchmark VMs exist. Returns (benchmark_ip, postgres_ip)."""
+    """Ensure Postgres and Benchmark VMs exist. Returns (benchmark_ip, postgres_ip, timings)."""
     print(f"\nChecking infrastructure for {cloud_config.name}...")
+    timings = InfraTimings()
 
     tf = get_terraform(cloud_config.terraform_dir)
     mode = infra_config.get("mode", "single") if infra_config else "single"
@@ -436,7 +446,7 @@ def ensure_infra(
                 postgres_ip, "pg_isready", timeout=10, jump_host=benchmark_ip
             )
             if code == 0:
-                return benchmark_ip, postgres_ip
+                return benchmark_ip, postgres_ip, timings
         except Exception:
             pass
 
@@ -460,12 +470,12 @@ def ensure_infra(
         )
 
     ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
-    tf_elapsed = int(time.time() - tf_start)
+    timings.terraform_s = time.time() - tf_start
 
     if ret_code != 0:
         raise RuntimeError(f"Failed to create infrastructure: {stderr}")
 
-    print(f"  Infrastructure created in {tf_elapsed}s")
+    print(f"  Terraform completed in {timings.terraform_s:.0f}s")
 
     postgres_ip = get_tf_output(tf, "postgres_vm_ip")
     benchmark_ip = get_tf_output(tf, "benchmark_vm_ip")
@@ -479,17 +489,24 @@ def ensure_infra(
     print(f"  Benchmark VM: {benchmark_ip}")
 
     # Wait for benchmark VM first (it has public IP)
+    vm_start = time.time()
     wait_for_vm_ready(benchmark_ip)
     # Wait for postgres VM via jump host (internal IP only)
     wait_for_vm_ready(postgres_ip, jump_host=benchmark_ip)
+    timings.vm_ready_s = time.time() - vm_start
 
     # Wait for Postgres to be ready
+    svc_start = time.time()
     if mode == "cluster":
         wait_for_patroni_ready(postgres_ip, jump_host=benchmark_ip)
     else:
         wait_for_postgres_ready(postgres_ip, jump_host=benchmark_ip)
+    timings.service_ready_s = time.time() - svc_start
 
-    return benchmark_ip, postgres_ip
+    total = timings.terraform_s + timings.vm_ready_s + timings.service_ready_s
+    print(f"  Infrastructure ready in {total:.0f}s (tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s)")
+
+    return benchmark_ip, postgres_ip, timings
 
 
 def wait_for_patroni_ready(
@@ -917,14 +934,17 @@ def objective_infra(
 
     # Destroy and recreate VM with new specs
     print("  Destroying previous VM...")
+    destroy_start = time.time()
     destroy_all(cloud_config.terraform_dir, cloud_config.name)
+    timings.destroy_s = time.time() - destroy_start
     time.sleep(5)
 
     # Create VMs
     try:
-        infra_start = time.time()
-        benchmark_ip, postgres_ip = ensure_infra(cloud_config, infra_config)
-        timings.terraform_s = time.time() - infra_start
+        benchmark_ip, postgres_ip, infra_timings = ensure_infra(cloud_config, infra_config)
+        timings.terraform_s = infra_timings.terraform_s
+        timings.vm_ready_s = infra_timings.vm_ready_s
+        timings.service_ready_s = infra_timings.service_ready_s
     except Exception as e:
         print(f"  Failed to create infrastructure: {e}")
         raise optuna.TrialPruned("Infrastructure creation failed")
@@ -959,8 +979,8 @@ def objective_infra(
 
     print(f"  Result: {result.tps:.1f} TPS, {result.latency_avg_ms:.2f}ms latency")
     print(
-        f"  Timings: infra={timings.terraform_s:.0f}s, init={timings.pgbench_init_s:.0f}s, "
-        f"bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
+        f"  Timings: destroy={timings.destroy_s:.0f}s, tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s, "
+        f"init={timings.pgbench_init_s:.0f}s, bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
     )
 
     # Save result
@@ -1172,7 +1192,7 @@ Examples:
             print(f"Fixed host: {infra_summary(infra_config)}")
 
             # Ensure VMs exist
-            benchmark_ip, postgres_ip = ensure_infra(cloud_config, infra_config)
+            benchmark_ip, postgres_ip, _ = ensure_infra(cloud_config, infra_config)
             print(f"\nPostgres VM IP: {postgres_ip}")
             print(f"Benchmark VM IP: {benchmark_ip}")
 
@@ -1252,7 +1272,7 @@ Examples:
 
             # Create VMs with best infra
             destroy_all(cloud_config.terraform_dir, cloud_config.name)
-            benchmark_ip, postgres_ip = ensure_infra(cloud_config, infra_config)
+            benchmark_ip, postgres_ip, _ = ensure_infra(cloud_config, infra_config)
 
             scale = max(50, infra_config["ram_gb"] * 10)
             initialize_pgbench(postgres_ip, scale=scale, jump_host=benchmark_ip)

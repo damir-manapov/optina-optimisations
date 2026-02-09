@@ -105,6 +105,15 @@ def get_config_search_space() -> dict[str, list[int]]:
 
 
 @dataclass
+class InfraTimings:
+    """Timing breakdown for infrastructure creation."""
+
+    terraform_s: float = 0.0  # Terraform apply
+    vm_ready_s: float = 0.0  # Wait for VM cloud-init
+    service_ready_s: float = 0.0  # Wait for service health
+
+
+@dataclass
 class TrialTimings:
     """Timing measurements for each phase of a trial."""
 
@@ -372,9 +381,10 @@ K6_SUMMARY_TREND_STATS="avg,min,med,max,p(90),p(95),p(99)" k6 run /tmp/benchmark
 
 def ensure_infra(
     cloud_config: CloudConfig, infra_config: dict | None = None
-) -> tuple[str, str]:
-    """Ensure Meilisearch and Benchmark VMs exist. Returns (benchmark_ip, meili_ip)."""
+) -> tuple[str, str, InfraTimings]:
+    """Ensure Meilisearch and Benchmark VMs exist. Returns (benchmark_ip, meili_ip, timings)."""
     print(f"\nChecking infrastructure for {cloud_config.name}...")
+    timings = InfraTimings()
 
     tf = get_terraform(cloud_config.terraform_dir)
 
@@ -392,7 +402,7 @@ def ensure_infra(
                 jump_host=benchmark_ip,
             )
             if code == 0:
-                return benchmark_ip, meili_ip
+                return benchmark_ip, meili_ip, timings
         except Exception:
             pass
 
@@ -412,12 +422,12 @@ def ensure_infra(
         tf_vars["meilisearch_disk_type"] = infra_config.get("disk_type", "fast")
 
     ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
-    tf_elapsed = int(time.time() - tf_start)
+    timings.terraform_s = time.time() - tf_start
 
     if ret_code != 0:
         raise RuntimeError(f"Failed to create infrastructure: {stderr}")
 
-    print(f"  Infrastructure created in {tf_elapsed}s")
+    print(f"  Terraform completed in {timings.terraform_s:.0f}s")
 
     meili_ip = get_tf_output(tf, "meilisearch_vm_ip")
     benchmark_ip = get_tf_output(tf, "benchmark_vm_ip")
@@ -431,11 +441,20 @@ def ensure_infra(
     print(f"  Benchmark VM: {benchmark_ip}")
 
     # Wait for VMs
+    vm_start = time.time()
     wait_for_vm_ready(benchmark_ip)
     wait_for_vm_ready(meili_ip, jump_host=benchmark_ip)
-    wait_for_meilisearch_ready(meili_ip, jump_host=benchmark_ip)
+    timings.vm_ready_s = time.time() - vm_start
 
-    return benchmark_ip, meili_ip
+    # Wait for Meilisearch to be ready
+    svc_start = time.time()
+    wait_for_meilisearch_ready(meili_ip, jump_host=benchmark_ip)
+    timings.service_ready_s = time.time() - svc_start
+
+    total = timings.terraform_s + timings.vm_ready_s + timings.service_ready_s
+    print(f"  Infrastructure ready in {total:.0f}s (tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s)")
+
+    return benchmark_ip, meili_ip, timings
 
 
 def reconfigure_meilisearch(
@@ -899,13 +918,16 @@ def objective_infra(
 
     # Destroy and recreate
     print("  Destroying previous VM...")
+    destroy_start = time.time()
     destroy_all(cloud_config.terraform_dir, cloud_config.name)
+    timings.destroy_s = time.time() - destroy_start
     time.sleep(5)
 
     try:
-        infra_start = time.time()
-        benchmark_ip, meili_ip = ensure_infra(cloud_config, infra_config)
-        timings.terraform_s = time.time() - infra_start
+        benchmark_ip, meili_ip, infra_timings = ensure_infra(cloud_config, infra_config)
+        timings.terraform_s = infra_timings.terraform_s
+        timings.vm_ready_s = infra_timings.vm_ready_s
+        timings.service_ready_s = infra_timings.service_ready_s
     except Exception as e:
         print(f"  Failed to create infrastructure: {e}")
         raise optuna.TrialPruned("Infrastructure creation failed")
@@ -939,8 +961,8 @@ def objective_infra(
         f"  Result: {result.qps:.1f} QPS, p95={result.p95_ms:.1f}ms, efficiency={eff:.2f} QPS/₽"
     )
     print(
-        f"  Timings: infra={timings.terraform_s:.0f}s, index={timings.indexing_s:.0f}s, "
-        f"bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
+        f"  Timings: destroy={timings.destroy_s:.0f}s, tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s, "
+        f"index={timings.indexing_s:.0f}s, bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
     )
 
     save_result(
@@ -1141,7 +1163,7 @@ def main() -> None:
                 "disk_type": "fast",
             }
 
-            benchmark_ip, meili_ip = ensure_infra(cloud_config, infra_config)
+            benchmark_ip, meili_ip, _ = ensure_infra(cloud_config, infra_config)
 
             # Initial indexing
             upload_and_index_dataset(benchmark_ip, meili_ip)
@@ -1222,7 +1244,7 @@ def main() -> None:
             print(f"Best infra: {infra_config}")
 
             destroy_all(cloud_config.terraform_dir, cloud_config.name)
-            benchmark_ip, meili_ip = ensure_infra(cloud_config, infra_config)
+            benchmark_ip, meili_ip, _ = ensure_infra(cloud_config, infra_config)
             upload_and_index_dataset(benchmark_ip, meili_ip)
 
             study_config = optuna.create_study(
