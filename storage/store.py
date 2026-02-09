@@ -158,11 +158,9 @@ class TrialStore:
         # Create trial
         trial = Trial.model_validate(data)
 
-        # Auto-assign ID
-        if trial.id is None and trial.trial is None:
+        # Auto-assign ID (always use _next_id for unique IDs)
+        if trial.id is None:
             trial.id = self._next_id()
-        elif trial.id is None and trial.trial is not None:
-            trial.id = trial.trial
 
         self.trials.append(trial)
         self._save()
