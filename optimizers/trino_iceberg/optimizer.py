@@ -410,13 +410,17 @@ def run_lookup_by_id_benchmark(
     trino_ip: str,
     duration: int = 60,
     concurrency: int = 8,
+    warmup: int = 10,
 ) -> BenchmarkResult:
     """Run point lookup by ID benchmark against Trino from benchmark VM.
 
     Executes random ID lookups: SELECT * FROM benchmark WHERE id = ?
     Benchmark runs on benchmark_ip, connecting to Trino at trino_ip:8080.
+
+    Args:
+        warmup: Warmup duration in seconds (JVM JIT, page cache, metadata cache)
     """
-    print(f"  Running lookup benchmark ({duration}s, {concurrency} concurrent) from benchmark VM...")
+    print(f"  Running lookup benchmark ({warmup}s warmup + {duration}s measured, {concurrency} concurrent) from benchmark VM...")
 
     # Get max ID for random lookups (query from benchmark VM)
     max_id_cmd = f"trino --server http://{trino_ip}:8080 --execute 'SELECT max(id) FROM iceberg.warehouse.benchmark' 2>/dev/null | tail -1"
@@ -435,14 +439,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 TRINO_SERVER = "http://{trino_ip}:8080"
 MAX_ID = {max_id}
+WARMUP = {warmup}
 DURATION = {duration}
 CONCURRENCY = {concurrency}
 
-latencies = []
-errors = 0
-
 def run_lookup():
-    global errors
     id_val = random.randint(1, MAX_ID)
     start = time.time()
     result = subprocess.run(
@@ -451,10 +452,22 @@ def run_lookup():
     )
     elapsed_ms = (time.time() - start) * 1000
     if result.returncode != 0:
-        errors += 1
         return None
     return elapsed_ms
 
+# Warmup phase (JVM JIT, page cache, metadata cache)
+print(f"Warming up for {{WARMUP}}s...", flush=True)
+warmup_start = time.time()
+with ThreadPoolExecutor(max_workers=CONCURRENCY) as executor:
+    while time.time() - warmup_start < WARMUP:
+        futures = [executor.submit(run_lookup) for _ in range(CONCURRENCY)]
+        for f in as_completed(futures):
+            f.result()  # Discard warmup results
+
+# Measured phase
+print(f"Measuring for {{DURATION}}s...", flush=True)
+latencies = []
+errors = 0
 start_time = time.time()
 completed = 0
 
@@ -466,6 +479,8 @@ with ThreadPoolExecutor(max_workers=CONCURRENCY) as executor:
             if lat is not None:
                 latencies.append(lat)
                 completed += 1
+            else:
+                errors += 1
 
 total_time = time.time() - start_time
 latencies.sort()
@@ -486,7 +501,7 @@ print(f"errors={{errors}}")
 
     start = time.time()
     bench_cmd = "python3 /tmp/lookup_bench.py 2>&1"
-    code, output = run_ssh_command(benchmark_ip, bench_cmd, timeout=duration + 120)
+    code, output = run_ssh_command(benchmark_ip, bench_cmd, timeout=warmup + duration + 120)
     elapsed = time.time() - start
 
     if code != 0:

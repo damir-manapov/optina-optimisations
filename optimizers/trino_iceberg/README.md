@@ -92,7 +92,8 @@ Point lookup by ID benchmark using concurrent queries:
 - Query: `SELECT * FROM benchmark WHERE id = ?`
 - Random IDs from dataset
 - Concurrency: 16 (fixed for fair comparison)
-- Duration: 60 seconds
+- Warmup: 10 seconds (JVM JIT, page cache, metadata cache)
+- Duration: 60 seconds (measured after warmup)
 - Runs from benchmark VM (over network) to Trino VM
 
 ## Data Generation
