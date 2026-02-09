@@ -15,23 +15,23 @@ Bayesian optimization for Trino + Iceberg + Nessie configuration.
 
 ```bash
 # Infrastructure optimization (tune VM specs)
-uv run python optimizers/trino-iceberg/optimizer.py --cloud selectel --mode infra --trials 10
+uv run python optimizers/trino_iceberg/optimizer.py -c selectel -m infra -t 10 -l damir
 
 # Config optimization on fixed host
-uv run python optimizers/trino-iceberg/optimizer.py --cloud selectel --mode config --cpu 8 --ram 32 --trials 20
+uv run python optimizers/trino_iceberg/optimizer.py -c selectel -m config --cpu 8 --ram 32 -t 20 -l damir
 
 # Full optimization (infra first, then config)
-uv run python optimizers/trino-iceberg/optimizer.py --cloud selectel --mode full --trials 20
+uv run python optimizers/trino_iceberg/optimizer.py -c selectel -m full -t 20 -l damir
 
 # Custom row count for larger datasets
-uv run python optimizers/trino-iceberg/optimizer.py --cloud selectel --mode infra --trials 10 --rows 100_000_000
+uv run python optimizers/trino_iceberg/optimizer.py -c selectel -m infra -t 10 --rows 100000000 -l damir
 
 # Optimize for latency instead of throughput
-uv run python optimizers/trino-iceberg/optimizer.py --cloud selectel --mode config --metric lookup_p99_ms --trials 20
+uv run python optimizers/trino_iceberg/optimizer.py -c selectel -m config --metric lookup_p99_ms -t 20 -l damir
 
 # View results
-uv run python optimizers/trino-iceberg/optimizer.py --cloud selectel --show-results
-uv run python optimizers/trino-iceberg/optimizer.py --cloud selectel --export-md
+uv run python optimizers/trino_iceberg/optimizer.py -c selectel --show-results
+uv run python optimizers/trino_iceberg/optimizer.py -c selectel --export-md
 ```
 
 ## Optimization Modes

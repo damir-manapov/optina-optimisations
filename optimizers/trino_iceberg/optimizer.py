@@ -11,17 +11,17 @@ Supports two optimization modes:
 
 Usage:
     # Infrastructure optimization (tune VM specs)
-    uv run python optimizers/trino-iceberg/optimizer.py --cloud selectel --mode infra --trials 10
+    uv run python optimizers/trino_iceberg/optimizer.py -c selectel -m infra -t 10 -l damir
 
     # Config optimization on fixed host (faster, more trials)
-    uv run python optimizers/trino-iceberg/optimizer.py --cloud selectel --mode config --cpu 8 --ram 32 --trials 20
+    uv run python optimizers/trino_iceberg/optimizer.py -c selectel -m config --cpu 8 --ram 32 -t 20 -l damir
 
     # Full optimization (infra first, then config on best host)
-    uv run python optimizers/trino-iceberg/optimizer.py --cloud selectel --mode full --trials 20
+    uv run python optimizers/trino_iceberg/optimizer.py -c selectel -m full -t 20 -l damir
 
     # Show results / export
-    uv run python optimizers/trino-iceberg/optimizer.py --cloud selectel --show-results
-    uv run python optimizers/trino-iceberg/optimizer.py --cloud selectel --export-md
+    uv run python optimizers/trino_iceberg/optimizer.py -c selectel --show-results
+    uv run python optimizers/trino_iceberg/optimizer.py -c selectel --export-md
 """
 
 import argparse
@@ -79,7 +79,7 @@ TRINO_PORT = 8080
 
 # Data generation
 SAMPLES_GENERATION_REPO = "https://github.com/making-ventures/samples-generation"
-DEFAULT_ROW_COUNT = 10_000_000  # 10M rows for benchmark
+DEFAULT_ROW_COUNT = 500_000_000  # 10M rows for benchmark
 
 
 def get_store() -> TrialStore:
@@ -998,33 +998,37 @@ def main():
     parser = argparse.ArgumentParser(
         description="Trino-Iceberg Configuration Optimizer",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Tune VM specs
+  uv run python optimizers/trino_iceberg/optimizer.py --cloud selectel --mode infra --trials 10 --login damir
+
+  # Tune Trino/Iceberg config on 8cpu/32gb host
+  uv run python optimizers/trino_iceberg/optimizer.py --cloud selectel --mode config --cpu 8 --ram 32 --trials 50 --login damir
+
+  # Full optimization
+  uv run python optimizers/trino_iceberg/optimizer.py --cloud selectel --mode full --trials 20 --login damir
+""",
     )
-    parser.add_argument(
-        "--cloud",
-        required=True,
-        choices=["selectel", "timeweb"],
-        help="Cloud provider",
+
+    # Use common argument helpers
+    from argparse_helpers import add_common_arguments
+
+    add_common_arguments(
+        parser,
+        metrics=METRICS,
+        default_metric="lookups_per_sec",
+        default_trials=20,
+        study_prefix="trino-iceberg",
+        with_mode=True,
+        mode_default="infra",
+        with_fixed_host=True,
+        cpu_default=4,
+        ram_default=16,
+        with_benchmark_vm=False,  # Benchmark runs on same VM
     )
-    parser.add_argument(
-        "--mode",
-        default="infra",
-        choices=["infra", "config", "full"],
-        help="Optimization mode",
-    )
-    parser.add_argument(
-        "--metric",
-        default="lookups_per_sec",
-        choices=list(METRICS.keys()),
-        help="Metric to optimize",
-    )
-    parser.add_argument("--trials", type=int, default=20, help="Number of trials")
-    parser.add_argument("--cpu", type=int, help="Fixed CPU (for config mode)")
-    parser.add_argument("--ram", type=int, help="Fixed RAM (for config mode)")
+    # Add trino-iceberg specific argument
     parser.add_argument("--rows", type=int, default=DEFAULT_ROW_COUNT, help="Number of rows to generate")
-    parser.add_argument("--login", default="", help="User login for tracking")
-    parser.add_argument("--no-destroy", action="store_true", help="Keep infrastructure after optimization")
-    parser.add_argument("--show-results", action="store_true", help="Show results and exit")
-    parser.add_argument("--export-md", action="store_true", help="Export results to markdown")
     args = parser.parse_args()
 
     cloud_config = get_cloud_config(args.cloud)
@@ -1037,13 +1041,9 @@ def main():
         export_results_md(args.cloud)
         return
 
-    # Validate config mode args
-    if args.mode == "config" and (args.cpu is None or args.ram is None):
-        parser.error("--cpu and --ram required for config mode")
-
     # Create Optuna study
     storage = f"sqlite:///{STUDY_DB}"
-    study_name = f"trino-iceberg-{args.cloud}-{args.mode}-{args.metric}"
+    study_name = args.study_name or f"trino-iceberg-{args.cloud}-{args.mode}-{args.metric}"
 
     metric_config = METRICS[args.metric]
     direction = "maximize" if metric_config.direction.value == "maximize" else "minimize"
