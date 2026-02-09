@@ -75,13 +75,54 @@ def get_cloud_config(cloud: str) -> CloudConfig:
 
 
 def get_config_space(cloud: str) -> dict:
-    """Get configuration space for optimization."""
+    """Get MinIO application configuration space.
+
+    Parameters that can be tuned without VM recreation.
+    Currently MinIO has limited tunable parameters, so we focus on:
+    - drives_per_node: number of data drives
+    - drive_size_gb: size of each data drive
+    - drive_type: SSD vs NVMe (affects IOPS)
+    """
     config = get_cloud_config(cloud)
 
     return {
-        "nodes": [1, 2, 3, 4],  # Reduced for cost control
+        "drives_per_node": [1, 2, 3, 4],
+        "drive_size_gb": [100, 200],
+        "drive_type": config.disk_types,
+    }
+
+
+def get_infra_search_space(cloud: str) -> dict:
+    """Get infrastructure search space (VM specs per MinIO node).
+
+    MinIO performance depends heavily on:
+    - CPU: for compression/encryption
+    - RAM: for caching
+    - Network: scales with node count
+    """
+    return {
         "cpu_per_node": [2, 4, 8],
         "ram_per_node": [4, 8, 16, 32],
+    }
+
+
+def get_cluster_search_space(cloud: str) -> dict:
+    """Get cluster topology search space.
+
+    Allows optimizer to explore:
+    - Number of MinIO nodes (1-4)
+    - VM specs per node
+    - Drive configuration
+    """
+    config = get_cloud_config(cloud)
+
+    return {
+        # Cluster topology
+        "nodes": [1, 2, 3, 4],
+        # Infrastructure per node
+        "cpu_per_node": [2, 4, 8],
+        "ram_per_node": [4, 8, 16, 32],
+        # Storage config
         "drives_per_node": [1, 2, 3, 4],
         "drive_size_gb": [100, 200],
         "drive_type": config.disk_types,

@@ -5,10 +5,24 @@ Multi-Cloud MinIO Configuration Optimizer using Bayesian Optimization (Optuna).
 Supports both Selectel and Timeweb Cloud providers.
 Automatically creates benchmark VM if not provided.
 
+Optimization Modes:
+- config: Optimize storage config (drives, disk size) on fixed VM specs
+- infra: Optimize VM specs (cpu, ram) with fixed storage config
+- cluster: Optimize both VM specs and storage config together
+
 Usage:
-    uv run python optimizers/minio/optimizer.py --cloud selectel --trials 5
-    uv run python optimizers/minio/optimizer.py --cloud selectel --trials 10 --metric cost_efficiency
-    uv run python optimizers/minio/optimizer.py --cloud timeweb --trials 10 --no-destroy
+    # Config mode (default) - optimize drives/disk on fixed 4cpu/8gb VMs
+    uv run python optimizers/minio/optimizer.py --cloud selectel --mode config --trials 5
+
+    # Infra mode - optimize VM specs with fixed 2 drives x 100gb
+    uv run python optimizers/minio/optimizer.py --cloud selectel --mode infra --nodes 2 --drives 2 --trials 5
+
+    # Cluster mode - optimize everything
+    uv run python optimizers/minio/optimizer.py --cloud selectel --mode cluster --trials 10
+
+    # Cluster mode with fixed nodes
+    uv run python optimizers/minio/optimizer.py --cloud selectel --mode cluster --nodes 4 --trials 10
+
     uv run python optimizers/minio/optimizer.py --cloud selectel --show-results
     uv run python optimizers/minio/optimizer.py --cloud selectel --export-md
 """
@@ -49,6 +63,8 @@ from optimizers.minio.cloud_config import (
     CloudConfig,
     get_cloud_config,
     get_config_space,
+    get_cluster_search_space,
+    get_infra_search_space,
 )
 from metrics import get_metric_value
 from optimizers.minio.metrics import METRICS
@@ -974,20 +990,263 @@ def objective(
     return metric_value
 
 
+def objective_infra(
+    trial: optuna.Trial,
+    cloud: str,
+    cloud_config: CloudConfig,
+    vm_ip: str,
+    login: str,
+    metric: str,
+    fixed_config: dict,
+) -> float:
+    """Optuna objective for infrastructure optimization with fixed storage config.
+
+    Optimizes VM specs (cpu, ram) while keeping storage config fixed.
+
+    Args:
+        fixed_config: Fixed storage config with keys:
+            - nodes: number of MinIO nodes
+            - drives_per_node: drives per node
+            - drive_size_gb: disk size
+            - drive_type: disk type
+    """
+    infra_space = get_infra_search_space(cloud)
+
+    # Sample infrastructure (CPU first, then valid RAM)
+    cpu_per_node = trial.suggest_categorical(
+        "cpu_per_node", infra_space["cpu_per_node"]
+    )
+    valid_ram = filter_valid_ram(cloud, cpu_per_node, infra_space["ram_per_node"])
+    ram_per_node = trial.suggest_categorical(
+        f"ram_per_node_cpu{cpu_per_node}", valid_ram
+    )
+
+    # Build full config with fixed storage and sampled infra
+    config = {
+        "nodes": fixed_config["nodes"],
+        "cpu_per_node": cpu_per_node,
+        "ram_per_node": ram_per_node,
+        "drives_per_node": fixed_config["drives_per_node"],
+        "drive_size_gb": fixed_config["drive_size_gb"],
+        "drive_type": fixed_config["drive_type"],
+    }
+
+    print(f"\n{'=' * 60}")
+    print(f"Trial {trial.number} [{cloud}] infra mode: {config}")
+    print(f"{'=' * 60}")
+
+    # Check cache
+    cached = find_cached_result(config, cloud)
+    if cached:
+        cached_value = get_metric_value(cached, metric, METRICS)
+        print(f"  Using cached result: {cached_value:.2f} ({metric})")
+        return cached_value
+
+    # Run the benchmark (same as original objective)
+    return _run_trial(trial, config, cloud, cloud_config, vm_ip, login, metric)
+
+
+def objective_cluster(
+    trial: optuna.Trial,
+    cloud: str,
+    cloud_config: CloudConfig,
+    vm_ip: str,
+    login: str,
+    metric: str,
+    fixed_cluster_config: dict | None = None,
+) -> float:
+    """Optuna objective for full cluster optimization.
+
+    Optimizes both infrastructure and storage configuration together.
+
+    Args:
+        fixed_cluster_config: Optional fixed config with keys:
+            - nodes: number of MinIO nodes
+            - cpu_per_node: CPU per node
+            - ram_per_node: RAM per node
+            - drives_per_node: drives per node
+            - drive_size_gb: disk size
+            - drive_type: disk type
+    """
+    cluster_space = get_cluster_search_space(cloud)
+
+    # Sample or use fixed values for each parameter
+    if fixed_cluster_config and fixed_cluster_config.get("nodes") is not None:
+        nodes = fixed_cluster_config["nodes"]
+    else:
+        nodes = trial.suggest_categorical("nodes", cluster_space["nodes"])
+
+    if fixed_cluster_config and fixed_cluster_config.get("cpu_per_node") is not None:
+        cpu_per_node = fixed_cluster_config["cpu_per_node"]
+    else:
+        cpu_per_node = trial.suggest_categorical(
+            "cpu_per_node", cluster_space["cpu_per_node"]
+        )
+
+    if fixed_cluster_config and fixed_cluster_config.get("ram_per_node") is not None:
+        ram_per_node = fixed_cluster_config["ram_per_node"]
+    else:
+        valid_ram = filter_valid_ram(cloud, cpu_per_node, cluster_space["ram_per_node"])
+        ram_per_node = trial.suggest_categorical(
+            f"ram_per_node_cpu{cpu_per_node}", valid_ram
+        )
+
+    if fixed_cluster_config and fixed_cluster_config.get("drives_per_node") is not None:
+        drives_per_node = fixed_cluster_config["drives_per_node"]
+    else:
+        drives_per_node = trial.suggest_categorical(
+            "drives_per_node", cluster_space["drives_per_node"]
+        )
+
+    if fixed_cluster_config and fixed_cluster_config.get("drive_size_gb") is not None:
+        drive_size_gb = fixed_cluster_config["drive_size_gb"]
+    else:
+        drive_size_gb = trial.suggest_categorical(
+            "drive_size_gb", cluster_space["drive_size_gb"]
+        )
+
+    if fixed_cluster_config and fixed_cluster_config.get("drive_type") is not None:
+        drive_type = fixed_cluster_config["drive_type"]
+    else:
+        drive_type = trial.suggest_categorical(
+            "drive_type", cluster_space["drive_type"]
+        )
+
+    config = {
+        "nodes": nodes,
+        "cpu_per_node": cpu_per_node,
+        "ram_per_node": ram_per_node,
+        "drives_per_node": drives_per_node,
+        "drive_size_gb": drive_size_gb,
+        "drive_type": drive_type,
+    }
+
+    print(f"\n{'=' * 60}")
+    print(f"Trial {trial.number} [{cloud}] cluster mode: {config}")
+    print(f"{'=' * 60}")
+
+    # Check cache
+    cached = find_cached_result(config, cloud)
+    if cached:
+        cached_value = get_metric_value(cached, metric, METRICS)
+        print(f"  Using cached result: {cached_value:.2f} ({metric})")
+        return cached_value
+
+    return _run_trial(trial, config, cloud, cloud_config, vm_ip, login, metric)
+
+
+def _run_trial(
+    trial: optuna.Trial,
+    config: dict,
+    cloud: str,
+    cloud_config: CloudConfig,
+    vm_ip: str,
+    login: str,
+    metric: str,
+) -> float:
+    """Common trial execution logic for all objective functions."""
+    trial_start = time.time()
+    timings = TrialTimings()
+
+    # Destroy any existing MinIO before deploying new config
+    print("  Cleaning up previous MinIO deployment...")
+    _, cleanup_time = destroy_minio(cloud_config)
+    post_destroy_wait = 15 if cloud == "selectel" else 5
+    time.sleep(post_destroy_wait)
+
+    # Deploy MinIO
+    success, deploy_timings = deploy_minio(config, cloud_config, vm_ip)
+    timings.terraform_s = deploy_timings.terraform_s
+    timings.vm_ready_s = deploy_timings.vm_ready_s
+    timings.service_ready_s = deploy_timings.service_ready_s
+    if not success:
+        timings.trial_total_s = time.time() - trial_start
+        save_result(
+            BenchmarkResult(config=config, error="Deploy failed", timings=timings),
+            config,
+            trial.number,
+            cloud,
+            cloud_config,
+            login,
+        )
+        raise optuna.TrialPruned("Deploy failed")
+
+    # Run system baseline (fio + sysbench) on first MinIO node
+    baseline_start = time.time()
+    baseline = run_system_baseline(vm_ip, target_ip="10.0.0.10", test_dir="/data1")
+    timings.baseline_s = time.time() - baseline_start
+
+    # Run benchmark
+    benchmark_start = time.time()
+    result = run_warp_benchmark(vm_ip)
+    timings.benchmark_s = time.time() - benchmark_start
+
+    if result is None:
+        timings.trial_total_s = time.time() - trial_start
+        save_result(
+            BenchmarkResult(
+                config=config,
+                error="Benchmark failed",
+                baseline=baseline,
+                timings=timings,
+            ),
+            config,
+            trial.number,
+            cloud,
+            cloud_config,
+            login,
+        )
+        raise optuna.TrialPruned("Benchmark failed")
+
+    # Destroy MinIO after benchmark to measure destroy time
+    _, destroy_time = destroy_minio(cloud_config)
+    timings.destroy_s = destroy_time
+    timings.trial_total_s = time.time() - trial_start
+
+    result.config = config
+    result.baseline = baseline
+    result.timings = timings
+    save_result(result, config, trial.number, cloud, cloud_config, login)
+
+    cost = calculate_cost(config, cloud)
+    cost_efficiency = result.total_mib_s / cost if cost > 0 else 0
+    result_metrics = {
+        "total_mib_s": result.total_mib_s,
+        "get_mib_s": result.get_mib_s,
+        "put_mib_s": result.put_mib_s,
+        "cost_efficiency": cost_efficiency,
+    }
+    metric_value = get_metric_value(result_metrics, metric, METRICS)
+    print(
+        f"  Result: {result.total_mib_s:.1f} MiB/s, Cost: {cost:.2f}/hr, {metric}={metric_value:.2f}"
+    )
+    print(
+        f"  Timings: tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s, baseline={timings.baseline_s:.0f}s, bench={timings.benchmark_s:.0f}s, destroy={timings.destroy_s:.0f}s, total={timings.trial_total_s:.0f}s"
+    )
+
+    return metric_value
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Multi-Cloud MinIO Optimizer",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Optimize for throughput (default)
-  uv run python optimizers/minio/optimizer.py --cloud selectel --trials 5
+  # Config mode (default) - optimize storage config on fixed 2-node 4cpu/8gb VMs
+  uv run python optimizers/minio/optimizer.py --cloud selectel --mode config --trials 5
 
-  # Optimize for cost efficiency (throughput per ruble)
-  uv run python optimizers/minio/optimizer.py --cloud selectel --trials 5 --metric cost_efficiency
+  # Infra mode - optimize VM specs with fixed storage (2 nodes, 2 drives x 100gb)
+  uv run python optimizers/minio/optimizer.py --cloud selectel --mode infra --nodes 2 --drives 2 --trials 5
 
-  # Optimize for read-heavy workloads
-  uv run python optimizers/minio/optimizer.py --cloud timeweb --trials 5 --metric get_mib_s
+  # Cluster mode - optimize everything
+  uv run python optimizers/minio/optimizer.py --cloud selectel --mode cluster --trials 10
+
+  # Cluster mode with fixed number of nodes
+  uv run python optimizers/minio/optimizer.py --cloud selectel --mode cluster --nodes 4 --trials 10
+
+  # Optimize for cost efficiency
+  uv run python optimizers/minio/optimizer.py --cloud selectel --mode cluster --metric cost_efficiency --trials 5
 
   # Keep infrastructure after optimization
   uv run python optimizers/minio/optimizer.py --cloud timeweb --trials 5 --no-destroy
@@ -1009,7 +1268,50 @@ Examples:
         default_metric="total_mib_s",
         default_trials=5,
         study_prefix="minio",
+        with_mode=True,
+        mode_default="config",
     )
+
+    # Fixed config arguments for infra and cluster modes
+    fixed_group = parser.add_argument_group(
+        "Fixed config", "Fix parameters for infra/cluster modes"
+    )
+    fixed_group.add_argument(
+        "--nodes",
+        type=int,
+        choices=[1, 2, 3, 4],
+        help="Fixed number of MinIO nodes",
+    )
+    fixed_group.add_argument(
+        "--cpu",
+        type=int,
+        choices=[2, 4, 8],
+        help="Fixed CPU per node",
+    )
+    fixed_group.add_argument(
+        "--ram",
+        type=int,
+        choices=[4, 8, 16, 32],
+        help="Fixed RAM (GB) per node",
+    )
+    fixed_group.add_argument(
+        "--drives",
+        type=int,
+        choices=[1, 2, 3, 4],
+        help="Fixed drives per node",
+    )
+    fixed_group.add_argument(
+        "--drive-size",
+        type=int,
+        choices=[100, 200],
+        help="Fixed drive size (GB)",
+    )
+    fixed_group.add_argument(
+        "--drive-type",
+        type=str,
+        help="Fixed drive type (e.g., fast, nvme)",
+    )
+
     args = parser.parse_args()
 
     # Handle --show-results
@@ -1023,11 +1325,12 @@ Examples:
         return
 
     cloud_config = get_cloud_config(args.cloud)
-    study_name = args.study_name or f"minio-{args.cloud}-{args.metric}"
+    study_name = args.study_name or f"minio-{args.cloud}-{args.mode}-{args.metric}"
 
     print("=" * 60)
     print(f"MinIO Optimizer - {args.cloud.upper()}")
     print("=" * 60)
+    print(f"Mode: {args.mode}")
     print(f"Metric: {args.metric} ({METRICS[args.metric]})")
     print(f"Trials: {args.trials}")
     print(f"Terraform dir: {cloud_config.terraform_dir}")
@@ -1073,19 +1376,100 @@ Examples:
     print()
 
     try:
-        # Run optimization
-        study.optimize(
-            lambda trial: objective(
-                trial, args.cloud, cloud_config, vm_ip, args.login, args.metric
-            ),
-            n_trials=args.trials,
-            show_progress_bar=True,
-            catch=(optuna.TrialPruned,),
-        )
+        # Select objective function based on mode
+        if args.mode == "config":
+            # Config mode: optimize storage config on fixed infra
+            # Use provided values or defaults for fixed infra
+            fixed_infra = {
+                "nodes": args.nodes or 2,
+                "cpu_per_node": args.cpu or 4,
+                "ram_per_node": args.ram or 8,
+            }
+            print(f"Fixed infra: {fixed_infra}")
+            print()
+
+            # Original objective uses config mode by default
+            study.optimize(
+                lambda trial: objective(
+                    trial, args.cloud, cloud_config, vm_ip, args.login, args.metric
+                ),
+                n_trials=args.trials,
+                show_progress_bar=True,
+                catch=(optuna.TrialPruned,),
+            )
+
+        elif args.mode == "infra":
+            # Infra mode: optimize VM specs with fixed storage config
+            # Build fixed storage config
+            fixed_config = {
+                "nodes": args.nodes or 2,
+                "drives_per_node": args.drives or 2,
+                "drive_size_gb": args.drive_size or 100,
+                "drive_type": args.drive_type or cloud_config.disk_types[0],
+            }
+            print(f"Fixed storage config: {fixed_config}")
+            print()
+
+            study.optimize(
+                lambda trial: objective_infra(
+                    trial,
+                    args.cloud,
+                    cloud_config,
+                    vm_ip,
+                    args.login,
+                    args.metric,
+                    fixed_config,
+                ),
+                n_trials=args.trials,
+                show_progress_bar=True,
+                catch=(optuna.TrialPruned,),
+            )
+
+        elif args.mode == "cluster":
+            # Cluster mode: optimize everything
+            # Build fixed config from CLI args (None values mean "sample")
+            fixed_cluster_config = {}
+            if args.nodes is not None:
+                fixed_cluster_config["nodes"] = args.nodes
+            if args.cpu is not None:
+                fixed_cluster_config["cpu_per_node"] = args.cpu
+            if args.ram is not None:
+                fixed_cluster_config["ram_per_node"] = args.ram
+            if args.drives is not None:
+                fixed_cluster_config["drives_per_node"] = args.drives
+            if args.drive_size is not None:
+                fixed_cluster_config["drive_size_gb"] = args.drive_size
+            if args.drive_type is not None:
+                fixed_cluster_config["drive_type"] = args.drive_type
+
+            if fixed_cluster_config:
+                print(f"Fixed cluster config: {fixed_cluster_config}")
+            else:
+                print("Full cluster optimization (no fixed params)")
+            print()
+
+            study.optimize(
+                lambda trial: objective_cluster(
+                    trial,
+                    args.cloud,
+                    cloud_config,
+                    vm_ip,
+                    args.login,
+                    args.metric,
+                    fixed_cluster_config if fixed_cluster_config else None,
+                ),
+                n_trials=args.trials,
+                show_progress_bar=True,
+                catch=(optuna.TrialPruned,),
+            )
+
+        else:
+            print(f"Unknown mode: {args.mode}")
+            return
 
         # Print results
         print("\n" + "=" * 60)
-        print(f"OPTIMIZATION COMPLETE ({args.cloud.upper()})")
+        print(f"OPTIMIZATION COMPLETE ({args.cloud.upper()}, {args.mode})")
         print("=" * 60)
 
         try:
