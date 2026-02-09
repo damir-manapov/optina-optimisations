@@ -517,12 +517,12 @@ def save_result(
     result: BenchmarkResult,
     infra_config: dict,
     meili_config: dict,
-    trial_num: int,
+    trial_number: int,
     cloud: str,
     cloud_config: CloudConfig,
     login: str,
     indexing_time: float = 0,
-):
+) -> None:
     """Save benchmark result."""
     store = get_store()
 
@@ -541,12 +541,12 @@ def save_result(
 
     store.add_dict(
         {
-            "trial": trial_num,
+            "trial": trial_number,
             "timestamp": datetime.now().isoformat(),
             "cloud": cloud,
             "login": login,
-            "infra": infra_config,
-            "config": meili_config,
+            "infra_config": infra_config,
+            "meili_config": meili_config,
             "metrics": {
                 "qps": result.qps,
                 "p50_ms": result.p50_ms,
@@ -566,8 +566,8 @@ def save_result(
 
 def config_summary(r: dict) -> str:
     """Format config as a compact string."""
-    infra = r.get("infra", {})
-    cfg = r.get("config", {})
+    infra = r.get("infra_config", {})
+    cfg = r.get("meili_config", {})
     infra_str = f"{infra.get('cpu', 0)}cpu/{infra.get('ram_gb', 0)}gb/{infra.get('disk_type', '?')}"
     # Always show config (0 = auto)
     mem = cfg.get("max_indexing_memory_mb", 0)
@@ -593,8 +593,8 @@ def format_results(cloud: str) -> dict | None:
 
     rows = []
     for r in results_sorted:
-        infra = r.get("infra", {})
-        cfg = r.get("config", {})
+        infra = r.get("infra_config", {})
+        cfg = r.get("meili_config", {})
         # Calculate cost on-the-fly from infra config
         cost = calculate_cost(infra, cloud)
         qps = get_metric(r, "qps")
@@ -772,7 +772,7 @@ def load_historical_trials(
         if r.get("cloud") == cloud
         and not r.get("error")
         and get_metric(r, "qps") > 0
-        and r.get("infra", {}).get("cpu")
+        and r.get("infra_config", {}).get("cpu")
     ]
 
     if not valid_results:
@@ -786,8 +786,8 @@ def load_historical_trials(
     seen_configs = set()
 
     for result in valid_results:
-        infra = result.get("infra", {})
-        config = result.get("config", {})
+        infra = result.get("infra_config", {})
+        config = result.get("meili_config", {})
 
         # Create a unique key to avoid duplicates
         config_key = config_to_key(infra, config, cloud)
