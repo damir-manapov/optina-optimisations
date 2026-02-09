@@ -5,9 +5,11 @@ Multi-Cloud Trino-Iceberg Configuration Optimizer using Bayesian Optimization (O
 Stack: Trino + Nessie + PostgreSQL (for Nessie catalog)
 Benchmark: Point lookups (SELECT * WHERE id = ?) via samples-generation
 
-Supports two optimization modes:
+Supports optimization modes:
 - infra: Tune VM specs (CPU, RAM, disk) - creates new VM per trial
 - config: Tune Trino/Iceberg settings on fixed host - reconfigures existing VM
+- cluster: Tune cluster topology (solo vs cluster, workers, external MinIO)
+- full: Infra first, then config on best host
 
 Usage:
     # Infrastructure optimization (tune VM specs)
@@ -15,6 +17,9 @@ Usage:
 
     # Config optimization on fixed host (faster, more trials)
     uv run python optimizers/trino_iceberg/optimizer.py -c selectel -m config --cpu 8 --ram 32 -t 20 -l damir
+
+    # Cluster topology optimization (solo vs cluster, workers, external MinIO)
+    uv run python optimizers/trino_iceberg/optimizer.py -c selectel -m cluster -t 10 -l damir
 
     # Full optimization (infra first, then config on best host)
     uv run python optimizers/trino_iceberg/optimizer.py -c selectel -m full -t 20 -l damir
@@ -58,6 +63,7 @@ from optimizers.trino_iceberg.cloud_config import (
     get_cloud_config,
     get_config_search_space,
     get_infra_search_space,
+    get_cluster_search_space,
     filter_compression_levels,
 )
 from optimizers.trino_iceberg.metrics import METRICS
@@ -90,6 +96,7 @@ class Mode(Enum):
     INFRA = "infra"
     CONFIG = "config"
     FULL = "full"
+    CLUSTER = "cluster"  # Cluster topology optimization
 
 
 @dataclass
@@ -724,8 +731,20 @@ def ensure_infra(
     cloud_config: CloudConfig,
     infra_config: dict,
     timings: TrialTimings,
+    cluster_config: dict | None = None,
 ) -> tuple[str, str]:
     """Ensure infrastructure exists with given config.
+
+    Args:
+        cloud_config: Cloud configuration
+        infra_config: Basic infra (cpu, ram_gb, disk_size_gb, disk_type)
+        timings: Timing measurements
+        cluster_config: Optional cluster topology config:
+            - trino_topology: "solo" or "cluster"
+            - trino_workers: number of workers (cluster mode)
+            - trino_worker_cpu/ram_gb: worker specs
+            - minio_enabled: use external MinIO
+            - minio_topology/nodes/cpu/ram_gb/disk_size_gb: MinIO cluster config
 
     Returns (benchmark_vm_ip, trino_vm_ip).
     """
@@ -739,12 +758,37 @@ def ensure_infra(
         "trino_disk_type": infra_config["disk_type"],
         # Disable other services
         "redis_enabled": "false",
-        "minio_enabled": "false",
         "postgres_enabled": "false",
         "meilisearch_enabled": "false",
     }
 
+    # Add cluster topology variables if provided
+    if cluster_config:
+        # Trino topology
+        tf_vars["trino_topology"] = cluster_config.get("trino_topology", "solo")
+        if cluster_config.get("trino_topology") == "cluster":
+            tf_vars["trino_workers"] = str(cluster_config.get("trino_workers", 2))
+            if cluster_config.get("trino_worker_cpu"):
+                tf_vars["trino_worker_cpu"] = str(cluster_config["trino_worker_cpu"])
+            if cluster_config.get("trino_worker_ram_gb"):
+                tf_vars["trino_worker_ram_gb"] = str(cluster_config["trino_worker_ram_gb"])
+
+        # MinIO topology
+        minio_enabled = cluster_config.get("minio_enabled", False)
+        tf_vars["minio_enabled"] = "true" if minio_enabled else "false"
+        if minio_enabled:
+            tf_vars["minio_topology"] = cluster_config.get("minio_topology", "cluster")
+            tf_vars["minio_nodes"] = str(cluster_config.get("minio_nodes", 4))
+            tf_vars["minio_cpu"] = str(cluster_config.get("minio_cpu", 2))
+            tf_vars["minio_ram_gb"] = str(cluster_config.get("minio_ram_gb", 4))
+            tf_vars["minio_disk_size_gb"] = str(cluster_config.get("minio_disk_size_gb", 50))
+    else:
+        tf_vars["minio_enabled"] = "false"
+        tf_vars["trino_topology"] = "solo"
+
     print(f"  Applying Terraform with: {infra_config}")
+    if cluster_config:
+        print(f"  Cluster config: {cluster_config}")
     tf_start = time.time()
     ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
     timings.terraform_s = time.time() - tf_start
@@ -864,6 +908,168 @@ def objective_infra(
             trial.number,
             cloud,
             "infra",
+            cloud_config,
+            login,
+        )
+
+        return get_metric_value(
+            {"metrics": {"lookup_by_id_per_sec": result.lookup_by_id_per_sec}},
+            metric,
+            METRICS,
+        )
+
+    except Exception as e:
+        print(f"  Trial failed: {e}")
+        raise optuna.TrialPruned()
+
+
+def objective_cluster(
+    trial: optuna.Trial,
+    cloud_config: CloudConfig,
+    metric: str,
+    login: str,
+    row_count: int,
+    default_trino_config: dict,
+) -> float:
+    """Objective function for cluster topology optimization.
+
+    Explores:
+    - Solo vs cluster mode for Trino
+    - Number of Trino workers
+    - Worker VM specs
+    - External MinIO cluster vs local
+    """
+    trial_start = time.time()
+    timings = TrialTimings()
+
+    cloud = cloud_config.name
+    infra_space = get_infra_search_space(cloud)
+    cluster_space = get_cluster_search_space(cloud)
+
+    # Sample base infrastructure (coordinator specs)
+    cpu = trial.suggest_categorical("cpu", infra_space["cpu"])
+    valid_ram = filter_valid_ram(cloud, cpu, infra_space["ram_gb"])
+    ram_gb = trial.suggest_categorical(f"ram_gb_cpu{cpu}", valid_ram)
+    disk_type = trial.suggest_categorical("disk_type", infra_space["disk_type"])
+    disk_size_gb = trial.suggest_categorical("disk_size_gb", infra_space["disk_size_gb"])
+
+    # Sample Trino topology
+    trino_topology = trial.suggest_categorical("trino_topology", cluster_space["trino_topology"])
+
+    cluster_config = {
+        "trino_topology": trino_topology,
+    }
+
+    # Cluster-specific parameters
+    if trino_topology == "cluster":
+        trino_workers = trial.suggest_categorical("trino_workers", cluster_space["trino_workers"])
+        trino_worker_cpu = trial.suggest_categorical("trino_worker_cpu", cluster_space["trino_worker_cpu"])
+        valid_worker_ram = filter_valid_ram(cloud, trino_worker_cpu, cluster_space["trino_worker_ram_gb"])
+        trino_worker_ram_gb = trial.suggest_categorical(
+            f"trino_worker_ram_gb_cpu{trino_worker_cpu}", valid_worker_ram
+        )
+        cluster_config.update({
+            "trino_workers": trino_workers,
+            "trino_worker_cpu": trino_worker_cpu,
+            "trino_worker_ram_gb": trino_worker_ram_gb,
+        })
+
+    # Sample MinIO topology
+    minio_enabled = trial.suggest_categorical("minio_enabled", cluster_space["minio_enabled"])
+    cluster_config["minio_enabled"] = minio_enabled
+
+    if minio_enabled:
+        minio_topology = trial.suggest_categorical("minio_topology", cluster_space["minio_topology"])
+        minio_nodes = trial.suggest_categorical("minio_nodes", cluster_space["minio_nodes"])
+        minio_cpu = trial.suggest_categorical("minio_cpu", cluster_space["minio_cpu"])
+        minio_ram_gb = trial.suggest_categorical("minio_ram_gb", cluster_space["minio_ram_gb"])
+        minio_disk_size_gb = trial.suggest_categorical("minio_disk_size_gb", cluster_space["minio_disk_size_gb"])
+        cluster_config.update({
+            "minio_topology": minio_topology,
+            "minio_nodes": minio_nodes,
+            "minio_cpu": minio_cpu,
+            "minio_ram_gb": minio_ram_gb,
+            "minio_disk_size_gb": minio_disk_size_gb,
+        })
+
+    infra_config = {
+        "cpu": cpu,
+        "ram_gb": ram_gb,
+        "disk_type": disk_type,
+        "disk_size_gb": disk_size_gb,
+    }
+
+    trino_config = default_trino_config.copy()
+
+    # Build summary for logging
+    topology_summary = f"trino={trino_topology}"
+    if trino_topology == "cluster":
+        topology_summary += f" workers={cluster_config['trino_workers']}x{cluster_config['trino_worker_cpu']}cpu"
+    if minio_enabled:
+        topology_summary += f" minio={cluster_config['minio_topology']}({cluster_config['minio_nodes']})"
+
+    print(f"\n[Trial {trial.number}] {cpu}cpu/{ram_gb}gb, {topology_summary}")
+
+    # Check cache (include cluster_config in key)
+    full_config = {**infra_config, "cluster": cluster_config}
+    cached = find_cached_result(full_config, trino_config, cloud)
+    if cached:
+        print("  Using cached result")
+        return get_metric_value(cached, metric, METRICS)
+
+    try:
+        benchmark_ip, trino_ip = ensure_infra(
+            cloud_config, infra_config, timings, cluster_config=cluster_config
+        )
+
+        # Run system baseline on coordinator
+        baseline_start = time.time()
+        baseline = run_system_baseline(
+            trino_ip, jump_host=benchmark_ip, test_dir="/data"
+        )
+        timings.baseline_s = time.time() - baseline_start
+
+        # Setup samples-generation
+        if not setup_samples_generation(trino_ip, jump_host=benchmark_ip):
+            raise RuntimeError("Failed to setup samples-generation")
+
+        # Generate data
+        data_start = time.time()
+        success, _ = generate_data(
+            trino_ip, trino_config, row_count, jump_host=benchmark_ip
+        )
+        timings.data_gen_s = time.time() - data_start
+        if not success:
+            raise RuntimeError("Data generation failed")
+
+        # Run benchmark
+        bench_start = time.time()
+        result = run_lookup_by_id_benchmark(
+            benchmark_ip, trino_ip, duration=60, concurrency=16
+        )
+        timings.benchmark_s = time.time() - bench_start
+
+        result.baseline = baseline
+        result.timings = timings
+        timings.trial_total_s = time.time() - trial_start
+
+        if result.error:
+            print(f"  Benchmark error: {result.error}")
+            raise optuna.TrialPruned()
+
+        print(
+            f"  Result: {result.lookup_by_id_per_sec:.1f} lookups/s, "
+            f"p50={result.lookup_by_id_p50_ms:.1f}ms, p99={result.lookup_by_id_p99_ms:.1f}ms"
+        )
+
+        # Include cluster config in saved result
+        save_result(
+            result,
+            {**infra_config, "cluster": cluster_config},
+            trino_config,
+            trial.number,
+            cloud,
+            "cluster",
             cloud_config,
             login,
         )
@@ -1161,11 +1367,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Tune VM specs
+  # Tune VM specs (solo mode)
   uv run python optimizers/trino_iceberg/optimizer.py --cloud selectel --mode infra --trials 10 --login damir
 
   # Tune Trino/Iceberg config on 8cpu/32gb host
   uv run python optimizers/trino_iceberg/optimizer.py --cloud selectel --mode config --cpu 8 --ram 32 --trials 50 --login damir
+
+  # Tune cluster topology (solo vs cluster, workers, external MinIO)
+  uv run python optimizers/trino_iceberg/optimizer.py --cloud selectel --mode cluster --trials 10 --login damir
 
   # Full optimization
   uv run python optimizers/trino_iceberg/optimizer.py --cloud selectel --mode full --trials 20 --login damir
@@ -1233,6 +1442,19 @@ Examples:
         if args.mode == "infra":
             study.optimize(
                 lambda t: objective_infra(
+                    t,
+                    cloud_config,
+                    args.metric,
+                    args.login,
+                    args.rows,
+                    get_default_trino_config(),
+                ),
+                n_trials=args.trials,
+            )
+        elif args.mode == "cluster":
+            # Cluster topology optimization
+            study.optimize(
+                lambda t: objective_cluster(
                     t,
                     cloud_config,
                     args.metric,

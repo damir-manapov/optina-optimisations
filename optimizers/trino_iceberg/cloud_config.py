@@ -13,6 +13,7 @@ __all__ = [
     "get_cloud_config",
     "get_infra_search_space",
     "get_config_search_space",
+    "get_cluster_search_space",
 ]
 
 
@@ -31,6 +32,31 @@ def get_infra_search_space(cloud: str) -> dict:
         "ram_gb": [16, 32, 64],  # Min 16GB for Trino heap
         "disk_type": ["nvme"] if cloud == "timeweb" else ["fast"],
         "disk_size_gb": [100, 200, 400],  # Iceberg tables can be large
+    }
+
+
+def get_cluster_search_space(cloud: str) -> dict:
+    """Get cluster topology search space.
+
+    Allows optimizer to explore:
+    - solo vs cluster mode for Trino
+    - number of workers in cluster mode
+    - worker VM specs
+    - external MinIO cluster vs local MinIO
+    """
+    return {
+        # Trino topology
+        "trino_topology": ["solo", "cluster"],
+        "trino_workers": [1, 2, 3],  # Number of workers in cluster mode
+        "trino_worker_cpu": [2, 4, 8],  # Worker CPU (None uses coordinator spec)
+        "trino_worker_ram_gb": [8, 16, 32],  # Worker RAM
+        # MinIO topology
+        "minio_enabled": [False, True],  # Use external MinIO cluster
+        "minio_topology": ["solo", "cluster"],  # MinIO mode when enabled
+        "minio_nodes": [4],  # Number of MinIO nodes (min 4 for distributed)
+        "minio_cpu": [2, 4],  # MinIO CPU per node
+        "minio_ram_gb": [4, 8],  # MinIO RAM per node
+        "minio_disk_size_gb": [50, 100],  # MinIO disk per node
     }
 
 

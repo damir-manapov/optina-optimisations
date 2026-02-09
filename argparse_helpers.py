@@ -222,6 +222,7 @@ def add_mode_argument(
     - 'infra': Optimize infrastructure (CPU, RAM, disk) with fixed config
     - 'config': Optimize service config on fixed infrastructure
     - 'full': Optimize both infrastructure and config together
+    - 'cluster': Optimize cluster topology (for services that support it)
 
     Args:
         parser: ArgumentParser instance to add argument to.
@@ -237,7 +238,7 @@ def add_mode_argument(
     parser.add_argument(
         "--mode",
         "-m",
-        choices=["infra", "config", "full"],
+        choices=["infra", "config", "full", "cluster"],
         default=default,
         help=f"Optimization mode (default: {default})",
     )
