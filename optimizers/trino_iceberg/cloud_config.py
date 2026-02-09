@@ -45,7 +45,6 @@ def get_config_search_space() -> dict:
         "trino_query_max_memory_pct": [30, 40, 50],  # % of heap for single query
         # Trino performance
         "task_concurrency": [4, 8, 16, 32],
-        "task_writer_count": [1, 2, 4],
         # Iceberg table properties - compression
         "compression": ["zstd", "snappy", "lz4", "gzip", "none"],
         "compression_level": [1, 3, 6, 9],  # 1=fast, 9=best (for zstd/gzip)

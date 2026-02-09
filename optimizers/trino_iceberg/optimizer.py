@@ -210,7 +210,6 @@ query.max-memory={query_max_memory_mb}MB
 query.max-memory-per-node={query_max_memory_mb}MB
 discovery.uri=http://localhost:{TRINO_PORT}
 task.concurrency={trino_config["task_concurrency"]}
-task.writer-count={trino_config["task_writer_count"]}
 """
 
     return {
@@ -908,9 +907,6 @@ def objective_config(
         "task_concurrency": trial.suggest_categorical(
             "task_concurrency", space["task_concurrency"]
         ),
-        "task_writer_count": trial.suggest_categorical(
-            "task_writer_count", space["task_writer_count"]
-        ),
         "compression": compression,
         "compression_level": compression_level,
         "partition_key": trial.suggest_categorical(
@@ -1145,7 +1141,6 @@ def get_default_trino_config() -> dict:
         "trino_heap_pct": 70,
         "trino_query_max_memory_pct": 40,
         "task_concurrency": 16,
-        "task_writer_count": 2,
         "compression": "zstd",
         "compression_level": 3,
         "partition_key": "none",
