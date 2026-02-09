@@ -1082,7 +1082,7 @@ def objective(
             cloud_config,
             login,
         )
-        return 0.0
+        raise optuna.TrialPruned("Deploy failed")
 
     # Run system baseline (fio + sysbench) on MinIO node
     baseline_start = time.time()
@@ -1109,7 +1109,7 @@ def objective(
             cloud_config,
             login,
         )
-        return 0.0
+        raise optuna.TrialPruned("Benchmark failed")
 
     # Destroy MinIO after benchmark to measure destroy time
     _, destroy_time = destroy_minio(cloud_config)
@@ -1246,6 +1246,7 @@ Examples:
             ),
             n_trials=args.trials,
             show_progress_bar=True,
+            catch=(optuna.TrialPruned,),
         )
 
         # Print results

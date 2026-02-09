@@ -843,6 +843,7 @@ Examples:
             ),
             n_trials=args.trials,
             show_progress_bar=True,
+            catch=(optuna.TrialPruned,),
         )
 
         print("\n" + "=" * 60)
