@@ -39,11 +39,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from common import (
     InfraTimings,
+    SystemBaseline,
     destroy_all,
     get_metric,
     get_terraform,
     get_tf_output,
     run_ssh_command,
+    run_system_baseline,
     wait_for_vm_ready,
 )
 from storage import TrialStore, get_store as _get_store
@@ -85,6 +87,7 @@ class TrialTimings:
     terraform_s: float = 0.0  # Terraform apply
     vm_ready_s: float = 0.0  # Wait for VM cloud-init
     service_ready_s: float = 0.0  # Wait for Postgres service
+    baseline_s: float = 0.0  # fio + sysbench tests
     pgbench_init_s: float = 0.0  # Initialize pgbench tables
     benchmark_s: float = 0.0  # pgbench run
     destroy_s: float = 0.0  # Terraform destroy
@@ -101,6 +104,7 @@ class BenchmarkResult:
     transactions: int = 0
     duration_s: float = 0.0
     error: str | None = None
+    baseline: SystemBaseline | None = None
     timings: TrialTimings | None = None
     pgbench_init_s: float = 0.0  # Initialize pgbench tables
     benchmark_s: float = 0.0  # pgbench run
@@ -684,10 +688,35 @@ def save_result(
             "terraform_s": result.timings.terraform_s,
             "vm_ready_s": result.timings.vm_ready_s,
             "service_ready_s": result.timings.service_ready_s,
+            "baseline_s": result.timings.baseline_s,
             "pgbench_init_s": result.timings.pgbench_init_s,
             "benchmark_s": result.timings.benchmark_s,
             "destroy_s": result.timings.destroy_s,
             "trial_total_s": result.timings.trial_total_s,
+        }
+
+    # Build baseline metrics dict if available
+    baseline_metrics = None
+    if result.baseline:
+        fio_metrics = None
+        if result.baseline.fio:
+            fio_metrics = {
+                "rand_read_iops": result.baseline.fio.rand_read_iops,
+                "rand_write_iops": result.baseline.fio.rand_write_iops,
+                "rand_read_lat_ms": result.baseline.fio.rand_read_lat_ms,
+                "rand_write_lat_ms": result.baseline.fio.rand_write_lat_ms,
+                "seq_read_mib_s": result.baseline.fio.seq_read_mib_s,
+                "seq_write_mib_s": result.baseline.fio.seq_write_mib_s,
+            }
+        sysbench_metrics = None
+        if result.baseline.sysbench:
+            sysbench_metrics = {
+                "cpu_events_per_sec": result.baseline.sysbench.cpu_events_per_sec,
+                "mem_mib_per_sec": result.baseline.sysbench.mem_mib_per_sec,
+            }
+        baseline_metrics = {
+            "fio": fio_metrics,
+            "sysbench": sysbench_metrics,
         }
 
     store.add_dict(
@@ -707,6 +736,7 @@ def save_result(
                 "duration_s": result.duration_s,
             },
             "error": result.error,
+            "system_baseline": baseline_metrics,
             "timings": timings_dict,
         }
     )
@@ -948,6 +978,11 @@ def objective_infra(
         print(f"  Failed to create infrastructure: {e}")
         raise optuna.TrialPruned("Infrastructure creation failed")
 
+    # Run system baseline (fio + sysbench) on Postgres node
+    baseline_start = time.time()
+    baseline = run_system_baseline(postgres_ip, jump_host=benchmark_ip)
+    timings.baseline_s = time.time() - baseline_start
+
     # Configure Postgres
     mode = infra_config.get("mode", "single")
     if not reconfigure_postgres(
@@ -974,12 +1009,13 @@ def objective_infra(
         raise optuna.TrialPruned(result.error)
 
     timings.trial_total_s = time.time() - trial_start
+    result.baseline = baseline
     result.timings = timings
 
     print(f"  Result: {result.tps:.1f} TPS, {result.latency_avg_ms:.2f}ms latency")
     print(
         f"  Timings: destroy={timings.destroy_s:.0f}s, tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s, "
-        f"init={timings.pgbench_init_s:.0f}s, bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
+        f"baseline={timings.baseline_s:.0f}s, init={timings.pgbench_init_s:.0f}s, bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
     )
 
     # Save result

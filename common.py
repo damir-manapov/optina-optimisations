@@ -1,5 +1,7 @@
 """Common utilities shared between optimizers."""
 
+import json
+import re
 import subprocess
 import time
 from dataclasses import dataclass
@@ -23,6 +25,43 @@ class InfraTimings:
     terraform_s: float = 0.0  # Terraform apply
     vm_ready_s: float = 0.0  # Wait for VM cloud-init/SSH
     service_ready_s: float = 0.0  # Wait for service health
+
+
+# ============================================================================
+# System Baseline Dataclasses
+# ============================================================================
+
+
+@dataclass
+class FioResult:
+    """FIO benchmark results for disk baseline."""
+
+    # Random 4K I/O
+    rand_read_iops: float = 0.0
+    rand_write_iops: float = 0.0
+    rand_read_lat_ms: float = 0.0
+    rand_write_lat_ms: float = 0.0
+    # Sequential 1M I/O
+    seq_read_mib_s: float = 0.0
+    seq_write_mib_s: float = 0.0
+
+
+@dataclass
+class SysbenchResult:
+    """Sysbench benchmark results for CPU and memory baseline."""
+
+    # CPU benchmark
+    cpu_events_per_sec: float = 0.0
+    # Memory benchmark
+    mem_mib_per_sec: float = 0.0
+
+
+@dataclass
+class SystemBaseline:
+    """Combined system baseline metrics."""
+
+    fio: FioResult | None = None
+    sysbench: SysbenchResult | None = None
 
 
 # ============================================================================
@@ -222,3 +261,205 @@ def destroy_all(terraform_dir: Path, cloud_name: str) -> bool:
 
     print("  All resources destroyed.")
     return True
+
+
+# ============================================================================
+# System Baseline Functions
+# ============================================================================
+
+
+def run_fio_baseline(
+    vm_ip: str,
+    target_ip: str | None = None,
+    test_dir: str = "/tmp",
+    jump_host: str | None = None,
+) -> FioResult | None:
+    """Run fio to get disk baseline performance.
+
+    Args:
+        vm_ip: IP of VM to run fio on (or jump host if target_ip is set)
+        target_ip: If set, SSH to this IP via vm_ip to run fio
+        test_dir: Directory to run fio tests in (e.g., /data1 for MinIO, /tmp for others)
+        jump_host: Alternative jump host (if vm_ip is the target itself)
+
+    Runs random 4K and sequential 1M tests.
+    """
+    print("  Running fio disk baseline...")
+
+    # Build fio command
+    fio_inner = (
+        f"fio --name=random_rw --directory={test_dir} --rw=randrw --rwmixread=70 "
+        f"--bs=4k --size=256M --numjobs=4 --runtime=20 --time_based --group_reporting "
+        f"--stonewall "
+        f"--name=seq_read --directory={test_dir} --rw=read "
+        f"--bs=1M --size=512M --numjobs=1 --runtime=10 --time_based "
+        f"--stonewall "
+        f"--name=seq_write --directory={test_dir} --rw=write "
+        f"--bs=1M --size=512M --numjobs=1 --runtime=10 --time_based "
+        f"--output-format=json 2>/dev/null"
+    )
+
+    if target_ip:
+        # SSH to target via vm_ip (jump host)
+        fio_cmd = (
+            f"ssh -A -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@{target_ip} "
+            f'"{fio_inner}" 2>/dev/null'
+        )
+        try:
+            code, output = run_ssh_command(
+                vm_ip, fio_cmd, timeout=120, forward_agent=True
+            )
+        except Exception as e:
+            print(f"  Fio failed: {e}")
+            return None
+    else:
+        # Run directly on vm_ip
+        try:
+            code, output = run_ssh_command(
+                vm_ip, fio_inner, timeout=120, jump_host=jump_host
+            )
+        except Exception as e:
+            print(f"  Fio failed: {e}")
+            return None
+
+    if code != 0:
+        print(f"  Fio failed with code {code}")
+        return None
+
+    return parse_fio_output(output)
+
+
+def parse_fio_output(output: str) -> FioResult | None:
+    """Parse fio JSON output with random and sequential tests."""
+    try:
+        # Find JSON in output (may have some stderr before it)
+        json_start = output.find("{")
+        if json_start == -1:
+            print("  Warning: No JSON found in fio output")
+            return None
+
+        try:
+            data = json.loads(output[json_start:])
+        except json.JSONDecodeError as e:
+            print(f"  Warning: Failed to parse fio JSON: {e}")
+            return None
+
+        jobs = data.get("jobs", [])
+        if not jobs:
+            print("  Warning: No jobs in fio output")
+            return None
+
+        result = FioResult()
+
+        for job in jobs:
+            job_name = job.get("jobname", "").lower()
+            read_stats = job.get("read", {})
+            write_stats = job.get("write", {})
+
+            if "random" in job_name:
+                # Random 4K - get IOPS and latency
+                result.rand_read_iops = read_stats.get("iops", 0)
+                result.rand_write_iops = write_stats.get("iops", 0)
+                read_lat_ns = read_stats.get("lat_ns", {}).get("mean", 0)
+                write_lat_ns = write_stats.get("lat_ns", {}).get("mean", 0)
+                result.rand_read_lat_ms = read_lat_ns / 1_000_000
+                result.rand_write_lat_ms = write_lat_ns / 1_000_000
+            elif "seq_read" in job_name:
+                # Sequential read 1M - get bandwidth
+                read_bw_kib = read_stats.get("bw", 0)
+                result.seq_read_mib_s = read_bw_kib / 1024
+            elif "seq_write" in job_name:
+                # Sequential write 1M - get bandwidth
+                write_bw_kib = write_stats.get("bw", 0)
+                result.seq_write_mib_s = write_bw_kib / 1024
+
+        print(
+            f"  Fio: rand {result.rand_read_iops:.0f}/{result.rand_write_iops:.0f} IOPS, "
+            f"seq {result.seq_read_mib_s:.0f}/{result.seq_write_mib_s:.0f} MiB/s"
+        )
+
+        return result
+    except json.JSONDecodeError as e:
+        print(f"  Warning: Failed to parse fio JSON: {e}")
+        return None
+    except Exception as e:
+        print(f"  Warning: Failed to parse fio output: {e}")
+        return None
+
+
+def run_sysbench_baseline(
+    vm_ip: str,
+    target_ip: str | None = None,
+    jump_host: str | None = None,
+) -> SysbenchResult | None:
+    """Run sysbench to get CPU and memory baseline.
+
+    Args:
+        vm_ip: IP of VM to run sysbench on (or jump host if target_ip is set)
+        target_ip: If set, SSH to this IP via vm_ip to run sysbench
+        jump_host: Alternative jump host (if vm_ip is the target itself)
+    """
+    print("  Running sysbench CPU/memory baseline...")
+
+    result = SysbenchResult()
+
+    def run_cmd(cmd: str, timeout: int = 30) -> tuple[int, str]:
+        if target_ip:
+            nested_cmd = (
+                f"ssh -A -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@{target_ip} "
+                f'"{cmd}" 2>/dev/null'
+            )
+            return run_ssh_command(
+                vm_ip, nested_cmd, timeout=timeout, forward_agent=True
+            )
+        else:
+            return run_ssh_command(vm_ip, cmd, timeout=timeout, jump_host=jump_host)
+
+    # CPU benchmark
+    try:
+        code, output = run_cmd("sysbench cpu --time=10 run 2>/dev/null")
+        if code == 0:
+            match = re.search(r"events per second:\s*([\d.]+)", output)
+            if match:
+                result.cpu_events_per_sec = float(match.group(1))
+    except Exception as e:
+        print(f"  CPU benchmark failed: {e}")
+
+    # Memory benchmark
+    try:
+        code, output = run_cmd(
+            "sysbench memory --memory-block-size=1M --memory-total-size=10G run 2>/dev/null"
+        )
+        if code == 0:
+            match = re.search(r"([\d.]+)\s*MiB/sec", output)
+            if match:
+                result.mem_mib_per_sec = float(match.group(1))
+    except Exception as e:
+        print(f"  Memory benchmark failed: {e}")
+
+    print(
+        f"  Sysbench: CPU {result.cpu_events_per_sec:.0f} events/s, "
+        f"MEM {result.mem_mib_per_sec:.0f} MiB/s"
+    )
+
+    return result
+
+
+def run_system_baseline(
+    vm_ip: str,
+    target_ip: str | None = None,
+    test_dir: str = "/tmp",
+    jump_host: str | None = None,
+) -> SystemBaseline:
+    """Run all system baseline benchmarks.
+
+    Args:
+        vm_ip: IP of VM to run baselines on (or jump host if target_ip is set)
+        target_ip: If set, SSH to this IP via vm_ip to run baselines
+        test_dir: Directory to run fio tests in
+        jump_host: Alternative jump host (if vm_ip is the target itself)
+    """
+    fio_result = run_fio_baseline(vm_ip, target_ip, test_dir, jump_host)
+    sysbench_result = run_sysbench_baseline(vm_ip, target_ip, jump_host)
+
+    return SystemBaseline(fio=fio_result, sysbench=sysbench_result)
