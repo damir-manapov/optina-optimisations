@@ -602,6 +602,55 @@ def export_results_md(cloud: str, output_path: Path | None = None) -> None:
 
 ## Common Pitfalls
 
+### Fixed Benchmark Concurrency
+
+Use **fixed concurrency** (e.g., 16 clients) for fair comparison across trials. Don't scale with CPU:
+
+```python
+# BAD: Different CPUs get different load, unfair comparison
+result = run_benchmark(concurrency=cpu * 2)
+
+# GOOD: Same load for all configurations
+result = run_benchmark(concurrency=16)
+```
+
+### Benchmark Location
+
+Run benchmarks **from the benchmark VM** to measure realistic network latency:
+
+```python
+# BAD: Runs on service VM (localhost, no network overhead)
+result = run_benchmark(service_ip, jump_host=benchmark_ip)
+
+# GOOD: Runs from benchmark VM over network
+result = run_benchmark(benchmark_ip, service_ip)
+```
+
+### Use argparse_helpers
+
+Always use `add_common_arguments()` for consistent CLI:
+
+```python
+# BAD: Manual args, missing shortcuts and required fields
+parser.add_argument("--cloud", required=True)
+parser.add_argument("--login", default="")  # Should be required!
+
+# GOOD: Consistent with all optimizers
+from argparse_helpers import add_common_arguments
+add_common_arguments(parser, metrics=METRICS, default_metric="throughput", ...)
+```
+
+This provides: `-c`/`--cloud`, `-l`/`--login` (required), `-t`/`--trials`, `-m`/`--mode`, `--study-name`.
+
+### No `__init__.py` in Optimizer Directories
+
+Optimizer directories don't need `__init__.py`. Python can import submodules without it:
+
+```python
+# This works without optimizers/redis/__init__.py
+from optimizers.redis.metrics import METRICS
+```
+
 ### JSON Parsing
 
 Always use `json.JSONDecoder().raw_decode()` for k6 output - it may have extra data after the JSON.
