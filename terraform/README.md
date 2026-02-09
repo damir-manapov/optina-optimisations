@@ -128,18 +128,89 @@ Runs: `terraform fmt`, `terraform validate`, `tflint`, `trivy`
 
 ## OpenStack CLI (Selectel)
 
-For debugging:
+For debugging and cleanup. Install OpenStack CLI first:
+
+```bash
+pip install python-openstackclient
+```
+
+Set environment variables:
 
 ```bash
 export OS_AUTH_URL="https://cloud.api.selcloud.ru/identity/v3"
 export OS_IDENTITY_API_VERSION=3
 export OS_PROJECT_DOMAIN_NAME="$TF_VAR_selectel_domain"
 export OS_USER_DOMAIN_NAME="$TF_VAR_selectel_domain"
-export OS_PROJECT_ID="$(terraform output -raw project_id)"
 export OS_USERNAME="$TF_VAR_selectel_username"
 export OS_PASSWORD="$TF_VAR_selectel_password"
 export OS_REGION_NAME="ru-7"
+```
 
+### Cleanup Stale Flavors
+
+When terraform state gets corrupted, flavors may become orphaned. Delete them manually:
+
+```bash
+# List all benchmark flavors
+openstack flavor list | grep -E 'benchmark|minio|trino'
+
+# Delete specific flavor by name
+openstack flavor delete benchmark-optuna-16vcpu-32gb
+
+# Delete all stale benchmark flavors (careful!)
+openstack flavor list -f value -c ID -c Name | grep benchmark | awk '{print $1}' | xargs -r openstack flavor delete
+```
+
+### Cleanup Stale Volumes
+
+```bash
+# List volumes
+openstack volume list
+
+# Delete orphaned volumes
+openstack volume delete <volume-id>
+```
+
+### Cleanup Stale VMs
+
+```bash
+# List servers
+openstack server list
+
+# Delete orphaned servers
+openstack server delete <server-id>
+```
+
+### Full Reset
+
+When things go wrong, do a full reset:
+
+```bash
+cd terraform/selectel
+
+# 1. Try terraform destroy first (may fail if state is corrupted)
+terraform destroy -auto-approve
+
+# 2. Reset terraform state
+rm -rf .terraform terraform.tfstate* .terraform.lock.hcl
+terraform init
+
+# 3. Manually cleanup orphaned resources via OpenStack CLI
+openstack flavor list | grep benchmark | awk '{print $1}' | xargs -r openstack flavor delete
+openstack server list | grep -E 'benchmark|minio|trino' | awk '{print $2}' | xargs -r openstack server delete
+openstack volume list | grep -E 'benchmark|minio|trino' | awk '{print $2}' | xargs -r openstack volume delete
+
+# 4. Delete Optuna study (optional, to start fresh)
+rm -f optimizers/trino_iceberg/study.db
+rm -f optimizers/minio/study.db
+```
+
+### Useful Commands
+
+```bash
 openstack flavor list
 openstack volume type list
+openstack server list
+openstack volume list
+openstack network list
 ```

@@ -119,12 +119,14 @@ class TrialStore:
             json.dump(data, f, indent=2, default=str)
 
     def _next_id(self) -> int:
-        """Get next available trial ID."""
-        if not self.trials:
+        """Get next available trial ID (global across all services)."""
+        # Load all trials (all services) to get globally unique ID
+        all_trials = self._load_all()
+        if not all_trials:
             return 1
         # Use max of both id and trial fields for compatibility
-        max_id = max((t.id or 0) for t in self.trials)
-        max_trial = max((t.trial or 0) for t in self.trials)
+        max_id = max((t.id or 0) for t in all_trials)
+        max_trial = max((t.trial or 0) for t in all_trials)
         return max(max_id, max_trial) + 1
 
     def add(self, trial: Trial) -> Trial:

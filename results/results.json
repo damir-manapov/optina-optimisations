@@ -485,7 +485,7 @@
     }
   },
   {
-    "id": 22,
+    "id": 12,
     "trial": 22,
     "timestamp": "2026-02-09T23:39:34.240571",
     "service": "minio",
@@ -513,7 +513,7 @@
     }
   },
   {
-    "id": 23,
+    "id": 13,
     "trial": 23,
     "timestamp": "2026-02-09T23:43:27.066851",
     "service": "minio",
@@ -558,7 +558,7 @@
     }
   },
   {
-    "id": 24,
+    "id": 14,
     "trial": 24,
     "timestamp": "2026-02-09T23:47:48.420664",
     "service": "minio",
@@ -599,6 +599,438 @@
       "sysbench": {
         "mem_mib_per_sec": 25296.52
       }
+    }
+  },
+  {
+    "id": 15,
+    "trial": 1,
+    "timestamp": "2026-02-10T00:14:12.848825",
+    "service": "trino-iceberg",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "infra_config": {
+      "cpu": 16,
+      "ram_gb": 32,
+      "disk_type": "fast",
+      "disk_size_gb": 400
+    },
+    "trino_config": {
+      "trino_heap_pct": 70,
+      "trino_query_max_memory_pct": 40,
+      "task_concurrency": 16,
+      "compression": "zstd",
+      "compression_level": 3,
+      "partition_key": "none",
+      "target_file_size_mb": 128
+    },
+    "cluster_config": {
+      "trino_topology": "solo",
+      "minio_enabled": true,
+      "minio_topology": "cluster",
+      "minio_nodes": 1,
+      "minio_cpu": 4,
+      "minio_ram_gb": 4,
+      "minio_disk_size_gb": 100,
+      "minio_disk_type": "fast"
+    },
+    "metrics": {
+      "lookup_by_id_per_sec": 2.7,
+      "lookup_by_id_p50_ms": 5460.2,
+      "lookup_by_id_p95_ms": 5984.93,
+      "lookup_by_id_p99_ms": 6177.64,
+      "total_lookups": 176,
+      "duration_s": 79.92338037490845
+    },
+    "mode": "cluster",
+    "timings": {
+      "benchmark_s": 105.11684513092041,
+      "trial_total_s": 897.3090946674347,
+      "baseline_s": 50.255685329437256,
+      "terraform_s": 114.09455966949463,
+      "vm_ready_s": 139.53813982009888
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8817.40913,
+        "rand_write_iops": 3797.260137,
+        "rand_read_lat_ms": 0.448163048532,
+        "rand_write_lat_ms": 0.009083903369,
+        "seq_read_mib_s": 340.8310546875,
+        "seq_write_mib_s": 276.1748046875
+      },
+      "sysbench": {}
+    }
+  },
+  {
+    "id": 16,
+    "trial": 8,
+    "timestamp": "2026-02-10T00:37:16.603451",
+    "service": "trino-iceberg",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "infra_config": {
+      "cpu": 8,
+      "ram_gb": 64,
+      "disk_type": "fast",
+      "disk_size_gb": 200
+    },
+    "trino_config": {
+      "trino_heap_pct": 70,
+      "trino_query_max_memory_pct": 40,
+      "task_concurrency": 16,
+      "compression": "zstd",
+      "compression_level": 3,
+      "partition_key": "none",
+      "target_file_size_mb": 128
+    },
+    "cluster_config": {
+      "trino_topology": "cluster",
+      "trino_workers": 2,
+      "trino_worker_cpu": 8,
+      "trino_worker_ram_gb": 16,
+      "minio_enabled": true,
+      "minio_topology": "cluster",
+      "minio_nodes": 1,
+      "minio_cpu": 4,
+      "minio_ram_gb": 4,
+      "minio_disk_size_gb": 100,
+      "minio_disk_type": "fast"
+    },
+    "metrics": {
+      "lookup_by_id_per_sec": 2.78,
+      "lookup_by_id_p50_ms": 4953.71,
+      "lookup_by_id_p95_ms": 5875.94,
+      "lookup_by_id_p99_ms": 6184.68,
+      "total_lookups": 176,
+      "duration_s": 78.1918876171112
+    },
+    "mode": "cluster",
+    "timings": {
+      "benchmark_s": 98.30441737174988,
+      "trial_total_s": 958.8106544017792,
+      "baseline_s": 53.25244951248169,
+      "terraform_s": 107.1768262386322,
+      "vm_ready_s": 215.6522982120514
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8795.410229,
+        "rand_write_iops": 3786.710664,
+        "rand_read_lat_ms": 0.450042904284,
+        "rand_write_lat_ms": 0.007704683105,
+        "seq_read_mib_s": 344.96484375,
+        "seq_write_mib_s": 275.037109375
+      },
+      "sysbench": {}
+    }
+  },
+  {
+    "id": 17,
+    "trial": 1,
+    "timestamp": "2026-02-10T02:46:26.491159",
+    "service": "trino-iceberg",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "infra_config": {
+      "cpu": 4,
+      "ram_gb": 64,
+      "disk_type": "fast",
+      "disk_size_gb": 400
+    },
+    "trino_config": {
+      "trino_heap_pct": 70,
+      "trino_query_max_memory_pct": 40,
+      "task_concurrency": 16,
+      "compression": "zstd",
+      "compression_level": 3,
+      "partition_key": "none",
+      "target_file_size_mb": 128
+    },
+    "cluster_config": {
+      "trino_topology": "cluster",
+      "trino_workers": 3,
+      "trino_worker_cpu": 4,
+      "trino_worker_ram_gb": 16,
+      "minio_enabled": true,
+      "minio_topology": "solo",
+      "minio_nodes": 1,
+      "minio_cpu": 4,
+      "minio_ram_gb": 4,
+      "minio_disk_size_gb": 100,
+      "minio_disk_type": "fast"
+    },
+    "metrics": {
+      "lookup_by_id_per_sec": 2.69,
+      "lookup_by_id_p50_ms": 5155.51,
+      "lookup_by_id_p95_ms": 6135.81,
+      "lookup_by_id_p99_ms": 6505.95,
+      "total_lookups": 176,
+      "duration_s": 80.78570413589478
+    },
+    "mode": "cluster",
+    "timings": {
+      "benchmark_s": 100.7666597366333,
+      "trial_total_s": 954.3102014064789,
+      "baseline_s": 48.72474551200867,
+      "terraform_s": 107.48213386535645,
+      "vm_ready_s": 126.49607872962952
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8745.062747,
+        "rand_write_iops": 3766.611669,
+        "rand_read_lat_ms": 0.451914557544,
+        "rand_write_lat_ms": 0.009019659459,
+        "seq_read_mib_s": 345.5302734375,
+        "seq_write_mib_s": 254.1171875
+      },
+      "sysbench": {}
+    }
+  },
+  {
+    "id": 18,
+    "trial": 2,
+    "timestamp": "2026-02-10T03:05:44.676520",
+    "service": "trino-iceberg",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "infra_config": {
+      "cpu": 16,
+      "ram_gb": 64,
+      "disk_type": "fast",
+      "disk_size_gb": 100
+    },
+    "trino_config": {
+      "trino_heap_pct": 70,
+      "trino_query_max_memory_pct": 40,
+      "task_concurrency": 16,
+      "compression": "zstd",
+      "compression_level": 3,
+      "partition_key": "none",
+      "target_file_size_mb": 128
+    },
+    "cluster_config": {
+      "trino_topology": "cluster",
+      "trino_workers": 1,
+      "trino_worker_cpu": 2,
+      "trino_worker_ram_gb": 32,
+      "minio_enabled": true,
+      "minio_topology": "solo",
+      "minio_nodes": 1,
+      "minio_cpu": 4,
+      "minio_ram_gb": 4,
+      "minio_disk_size_gb": 100,
+      "minio_disk_type": "fast"
+    },
+    "metrics": {
+      "lookup_by_id_per_sec": 2.6,
+      "lookup_by_id_p50_ms": 5427.84,
+      "lookup_by_id_p95_ms": 6449.5,
+      "lookup_by_id_p99_ms": 6602.28,
+      "total_lookups": 160,
+      "duration_s": 78.64495849609375
+    },
+    "mode": "cluster",
+    "timings": {
+      "benchmark_s": 101.98918271064758,
+      "trial_total_s": 1158.168920993805,
+      "baseline_s": 53.2313027381897,
+      "terraform_s": 123.25341773033142,
+      "vm_ready_s": 106.19561123847961
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 7779.95245,
+        "rand_write_iops": 3349.707056,
+        "rand_read_lat_ms": 0.42232486088300003,
+        "rand_write_lat_ms": 0.008470882863,
+        "seq_read_mib_s": 336.4326171875,
+        "seq_write_mib_s": 280.6904296875
+      },
+      "sysbench": {}
+    }
+  },
+  {
+    "id": 25,
+    "trial": 0,
+    "timestamp": "2026-02-10T04:28:51.414698",
+    "service": "trino-iceberg",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "infra_config": {
+      "cpu": 4,
+      "ram_gb": 16,
+      "disk_type": "fast",
+      "disk_size_gb": 100
+    },
+    "trino_config": {
+      "trino_heap_pct": 70,
+      "trino_query_max_memory_pct": 40,
+      "task_concurrency": 16,
+      "compression": "zstd",
+      "compression_level": 3,
+      "partition_key": "none",
+      "target_file_size_mb": 128
+    },
+    "cluster_config": {
+      "trino_topology": "cluster",
+      "trino_workers": 2,
+      "trino_worker_cpu": 2,
+      "trino_worker_ram_gb": 32,
+      "minio_enabled": true,
+      "minio_topology": "solo",
+      "minio_nodes": 1,
+      "minio_cpu": 4,
+      "minio_ram_gb": 4,
+      "minio_disk_size_gb": 100,
+      "minio_disk_type": "fast"
+    },
+    "metrics": {
+      "lookup_by_id_per_sec": 2.72,
+      "lookup_by_id_p50_ms": 5152.53,
+      "lookup_by_id_p95_ms": 6097.24,
+      "lookup_by_id_p99_ms": 6231.94,
+      "total_lookups": 176,
+      "duration_s": 82.07587909698486
+    },
+    "mode": "cluster",
+    "timings": {
+      "benchmark_s": 105.2444863319397,
+      "trial_total_s": 1131.2957746982574,
+      "baseline_s": 49.69744515419006,
+      "terraform_s": 99.11431312561035,
+      "vm_ready_s": 171.12750601768494
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8586.470676,
+        "rand_write_iops": 3701.964902,
+        "rand_read_lat_ms": 0.46090973732100005,
+        "rand_write_lat_ms": 0.008130062788,
+        "seq_read_mib_s": 345.365234375,
+        "seq_write_mib_s": 263.873046875
+      },
+      "sysbench": {}
+    }
+  },
+  {
+    "id": 26,
+    "trial": 1,
+    "timestamp": "2026-02-10T04:44:33.396543",
+    "service": "trino-iceberg",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "infra_config": {
+      "cpu": 8,
+      "ram_gb": 32,
+      "disk_type": "fast",
+      "disk_size_gb": 400
+    },
+    "trino_config": {
+      "trino_heap_pct": 70,
+      "trino_query_max_memory_pct": 40,
+      "task_concurrency": 16,
+      "compression": "zstd",
+      "compression_level": 3,
+      "partition_key": "none",
+      "target_file_size_mb": 128
+    },
+    "cluster_config": {
+      "trino_topology": "solo",
+      "minio_enabled": true,
+      "minio_topology": "solo",
+      "minio_nodes": 1,
+      "minio_cpu": 4,
+      "minio_ram_gb": 4,
+      "minio_disk_size_gb": 100,
+      "minio_disk_type": "fast"
+    },
+    "metrics": {
+      "lookup_by_id_per_sec": 2.71,
+      "lookup_by_id_p50_ms": 5189.38,
+      "lookup_by_id_p95_ms": 6035.32,
+      "lookup_by_id_p99_ms": 6518.91,
+      "total_lookups": 176,
+      "duration_s": 79.26136350631714
+    },
+    "mode": "cluster",
+    "timings": {
+      "benchmark_s": 99.12300157546997,
+      "trial_total_s": 941.9595766067505,
+      "baseline_s": 50.634180784225464,
+      "terraform_s": 72.2112364768982,
+      "vm_ready_s": 128.5378532409668
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8699.665017,
+        "rand_write_iops": 3746.912654,
+        "rand_read_lat_ms": 0.454578706653,
+        "rand_write_lat_ms": 0.008597823077,
+        "seq_read_mib_s": 344.73046875,
+        "seq_write_mib_s": 275.234375
+      },
+      "sysbench": {}
+    }
+  },
+  {
+    "id": 27,
+    "trial": 2,
+    "timestamp": "2026-02-10T05:00:16.311327",
+    "service": "trino-iceberg",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "infra_config": {
+      "cpu": 16,
+      "ram_gb": 32,
+      "disk_type": "fast",
+      "disk_size_gb": 100
+    },
+    "trino_config": {
+      "trino_heap_pct": 70,
+      "trino_query_max_memory_pct": 40,
+      "task_concurrency": 16,
+      "compression": "zstd",
+      "compression_level": 3,
+      "partition_key": "none",
+      "target_file_size_mb": 128
+    },
+    "cluster_config": {
+      "trino_topology": "solo",
+      "minio_enabled": true,
+      "minio_topology": "solo",
+      "minio_nodes": 1,
+      "minio_cpu": 4,
+      "minio_ram_gb": 4,
+      "minio_disk_size_gb": 100,
+      "minio_disk_type": "fast"
+    },
+    "metrics": {
+      "lookup_by_id_per_sec": 2.69,
+      "lookup_by_id_p50_ms": 5320.98,
+      "lookup_by_id_p95_ms": 6222.76,
+      "lookup_by_id_p99_ms": 6303.82,
+      "total_lookups": 176,
+      "duration_s": 81.04584050178528
+    },
+    "mode": "cluster",
+    "timings": {
+      "benchmark_s": 100.91669058799744,
+      "trial_total_s": 942.8851685523987,
+      "baseline_s": 51.855114221572876,
+      "terraform_s": 85.11558961868286,
+      "vm_ready_s": 126.73298072814941
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8077.981045,
+        "rand_write_iops": 3478.025127,
+        "rand_read_lat_ms": 0.40839222811000003,
+        "rand_write_lat_ms": 0.007769672695,
+        "seq_read_mib_s": 321.8349609375,
+        "seq_write_mib_s": 288.734375
+      },
+      "sysbench": {}
     }
   }
 ]

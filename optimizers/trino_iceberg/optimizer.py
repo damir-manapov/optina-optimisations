@@ -46,10 +46,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from common import (
     SystemBaseline,
+    clear_terraform_state,
     destroy_all,
     get_metric,
     get_terraform,
     get_tf_output,
+    is_stale_state_error,
     run_ssh_command,
     run_system_baseline,
     wait_for_vm_ready,
@@ -729,6 +731,63 @@ def save_result(
     export_results_md(cloud)
 
 
+def destroy_trino_cluster(cloud_config: CloudConfig) -> tuple[bool, float]:
+    """Destroy Trino and MinIO infrastructure. Returns (success, duration_s).
+
+    Unlike MinIO optimizer which keeps benchmark VM, this destroys everything
+    because Trino topology changes require volume size changes (can't shrink).
+    """
+    print(f"  Destroying Trino cluster on {cloud_config.name}...")
+    start = time.time()
+
+    # Check if there's any state to destroy
+    state_file = cloud_config.terraform_dir / "terraform.tfstate"
+    if not state_file.exists():
+        print("  No terraform state, skipping destroy")
+        return True, time.time() - start
+
+    # Check if state has any resources
+    try:
+        import json
+
+        with open(state_file) as f:
+            state = json.load(f)
+        resources = state.get("resources", [])
+        if not resources:
+            print("  Empty terraform state, skipping destroy")
+            return True, time.time() - start
+    except Exception:
+        pass  # If we can't read state, try destroy anyway
+
+    tf = get_terraform(cloud_config.terraform_dir)
+
+    # Use terraform destroy instead of apply with disabled flags
+    # This properly destroys without creating project first
+    import subprocess
+
+    result = subprocess.run(
+        ["terraform", "destroy", "-auto-approve"],
+        cwd=str(cloud_config.terraform_dir),
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        # Handle stale state gracefully
+        if is_stale_state_error(result.stderr):
+            print("  Stale state detected, clearing state...")
+            clear_terraform_state(cloud_config.terraform_dir)
+            return True, time.time() - start
+        print(
+            f"  Warning: Destroy may have failed: {result.stderr[:500] if result.stderr else ''}"
+        )
+        return False, time.time() - start
+
+    duration = time.time() - start
+    print(f"  Trino cluster destroyed in {duration:.1f}s")
+    return True, duration
+
+
 def ensure_infra(
     cloud_config: CloudConfig,
     infra_config: dict,
@@ -788,6 +847,8 @@ def ensure_infra(
             tf_vars["minio_disk_size_gb"] = str(
                 cluster_config.get("minio_disk_size_gb", 50)
             )
+            if cluster_config.get("minio_disk_type"):
+                tf_vars["minio_disk_type"] = cluster_config["minio_disk_type"]
     else:
         tf_vars["minio_enabled"] = "false"
         tf_vars["trino_topology"] = "solo"
@@ -838,6 +899,15 @@ def objective_infra(
     timings = TrialTimings()
 
     cloud = cloud_config.name
+
+    # Destroy previous Trino before deploying new config
+    # (volumes can't be shrunk, so we must recreate)
+    print("  Cleaning up previous Trino deployment...")
+    _, cleanup_time = destroy_trino_cluster(cloud_config)
+    # OpenStack needs time to release resources
+    post_destroy_wait = 15 if cloud == "selectel" else 5
+    time.sleep(post_destroy_wait)
+
     space = get_infra_search_space(cloud)
 
     # Sample infrastructure parameters
@@ -965,6 +1035,15 @@ def objective_cluster(
     timings = TrialTimings()
 
     cloud = cloud_config.name
+
+    # Destroy previous Trino cluster before deploying new config
+    # (volumes can't be shrunk, so we must recreate)
+    print("  Cleaning up previous Trino deployment...")
+    _, cleanup_time = destroy_trino_cluster(cloud_config)
+    # OpenStack needs time to release resources
+    post_destroy_wait = 15 if cloud == "selectel" else 5
+    time.sleep(post_destroy_wait)
+
     infra_space = get_infra_search_space(cloud)
     cluster_space = get_cluster_search_space(cloud)
 
@@ -1078,6 +1157,13 @@ def objective_cluster(
                 "minio_disk_size_gb", cluster_space["minio_disk_size_gb"]
             )
 
+        if fixed_minio_config and fixed_minio_config.get("minio_disk_type"):
+            minio_disk_type = fixed_minio_config["minio_disk_type"]
+        else:
+            minio_disk_type = trial.suggest_categorical(
+                "minio_disk_type", cluster_space["minio_disk_type"]
+            )
+
         cluster_config.update(
             {
                 "minio_topology": minio_topology,
@@ -1085,6 +1171,7 @@ def objective_cluster(
                 "minio_cpu": minio_cpu,
                 "minio_ram_gb": minio_ram_gb,
                 "minio_disk_size_gb": minio_disk_size_gb,
+                "minio_disk_type": minio_disk_type,
             }
         )
 
@@ -1562,6 +1649,12 @@ Examples:
         default=None,
         help="MinIO disk (GB) per node",
     )
+    minio_group.add_argument(
+        "--minio-disk-type",
+        type=str,
+        default=None,
+        help="MinIO disk type (e.g., fast, basicssd, universal)",
+    )
     args = parser.parse_args()
 
     cloud_config = get_cloud_config(args.cloud)
@@ -1641,6 +1734,7 @@ Examples:
                     args.minio_cpu,
                     args.minio_ram,
                     args.minio_disk,
+                    args.minio_disk_type,
                 ]
             ):
                 fixed_minio_config = {
@@ -1652,6 +1746,7 @@ Examples:
                     "minio_cpu": args.minio_cpu,
                     "minio_ram_gb": args.minio_ram,
                     "minio_disk_size_gb": args.minio_disk,
+                    "minio_disk_type": args.minio_disk_type,
                 }
                 print(f"Fixed MinIO config: {fixed_minio_config}")
 
@@ -1737,6 +1832,7 @@ Examples:
                     args.minio_cpu,
                     args.minio_ram,
                     args.minio_disk,
+                    args.minio_disk_type,
                 ]
             ):
                 fixed_minio_config = {
@@ -1748,6 +1844,7 @@ Examples:
                     "minio_cpu": args.minio_cpu,
                     "minio_ram_gb": args.minio_ram,
                     "minio_disk_size_gb": args.minio_disk,
+                    "minio_disk_type": args.minio_disk_type,
                 }
                 print(f"Fixed MinIO config: {fixed_minio_config}")
 

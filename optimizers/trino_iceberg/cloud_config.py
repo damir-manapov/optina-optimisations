@@ -44,6 +44,8 @@ def get_cluster_search_space(cloud: str) -> dict:
     - worker VM specs
     - external MinIO cluster vs local MinIO
     """
+    config = get_cloud_config(cloud)
+
     return {
         # Trino topology
         "trino_topology": ["solo", "cluster"],
@@ -57,6 +59,7 @@ def get_cluster_search_space(cloud: str) -> dict:
         "minio_cpu": [2, 4],  # MinIO CPU per node
         "minio_ram_gb": [4, 8],  # MinIO RAM per node
         "minio_disk_size_gb": [50, 100],  # MinIO disk per node
+        "minio_disk_type": config.disk_types,  # MinIO disk type
     }
 
 
