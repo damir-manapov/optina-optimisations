@@ -230,8 +230,10 @@ class MemtierResult:
 class TrialTimings:
     """Timing measurements for each phase of a trial."""
 
-    redis_deploy_s: float = 0.0  # Terraform + wait for Redis
+    terraform_s: float = 0.0  # Terraform apply
+    service_ready_s: float = 0.0  # Wait for Redis to be ready
     benchmark_s: float = 0.0  # memtier benchmark
+    destroy_s: float = 0.0  # Terraform destroy
     trial_total_s: float = 0.0  # End-to-end trial time
 
 
@@ -620,8 +622,10 @@ def save_result(
     timings_dict = None
     if result.timings:
         timings_dict = {
-            "redis_deploy_s": result.timings.redis_deploy_s,
+            "terraform_s": result.timings.terraform_s,
+            "service_ready_s": result.timings.service_ready_s,
             "benchmark_s": result.timings.benchmark_s,
+            "destroy_s": result.timings.destroy_s,
             "trial_total_s": result.timings.trial_total_s,
         }
 
@@ -701,12 +705,13 @@ def objective(
 
     # Destroy any existing Redis
     print("  Cleaning up previous Redis deployment...")
-    destroy_redis(cloud_config)
+    _, destroy_time = destroy_redis(cloud_config)
+    timings.destroy_s = destroy_time
     time.sleep(10)
 
     # Deploy Redis
     success, deploy_time = deploy_redis(config, cloud_config, vm_ip)
-    timings.redis_deploy_s = deploy_time
+    timings.terraform_s = deploy_time
     if not success:
         print("  Deploy failed - marking trial as pruned (will retry config later)")
         raise optuna.TrialPruned("Deploy failed")
@@ -738,7 +743,7 @@ def objective(
         f"  Result: {result.ops_per_sec:.0f} ops/s, p99={result.p99_latency_ms:.2f}ms, Cost: {cost:.2f}/hr"
     )
     print(
-        f"  Timings: deploy={timings.redis_deploy_s:.0f}s, bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
+        f"  Timings: destroy={timings.destroy_s:.0f}s, deploy={timings.terraform_s:.0f}s, bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
     )
 
     return metric_value

@@ -258,10 +258,11 @@ class SystemBaseline:
 class TrialTimings:
     """Timing measurements for each phase of a trial."""
 
-    minio_deploy_s: float = 0.0  # Terraform create MinIO cluster
+    terraform_s: float = 0.0  # Terraform create MinIO cluster
+    service_ready_s: float = 0.0  # Wait for MinIO to be ready
     baseline_s: float = 0.0  # fio + sysbench tests
     benchmark_s: float = 0.0  # warp benchmark
-    minio_destroy_s: float = 0.0  # Terraform destroy MinIO
+    destroy_s: float = 0.0  # Terraform destroy MinIO
     trial_total_s: float = 0.0  # End-to-end trial time
 
 
@@ -981,10 +982,11 @@ def save_result(
     timings_metrics = None
     if result.timings:
         timings_metrics = {
-            "minio_deploy_s": result.timings.minio_deploy_s,
+            "terraform_s": result.timings.terraform_s,
+            "service_ready_s": result.timings.service_ready_s,
             "baseline_s": result.timings.baseline_s,
             "benchmark_s": result.timings.benchmark_s,
-            "minio_destroy_s": result.timings.minio_destroy_s,
+            "destroy_s": result.timings.destroy_s,
             "trial_total_s": result.timings.trial_total_s,
         }
 
@@ -1071,7 +1073,7 @@ def objective(
 
     # Deploy MinIO
     success, deploy_time = deploy_minio(config, cloud_config, vm_ip)
-    timings.minio_deploy_s = deploy_time
+    timings.terraform_s = deploy_time
     if not success:
         timings.trial_total_s = time.time() - trial_start
         save_result(
@@ -1113,7 +1115,7 @@ def objective(
 
     # Destroy MinIO after benchmark to measure destroy time
     _, destroy_time = destroy_minio(cloud_config)
-    timings.minio_destroy_s = destroy_time
+    timings.destroy_s = destroy_time
     timings.trial_total_s = time.time() - trial_start
 
     result.config = config
@@ -1134,7 +1136,7 @@ def objective(
         f"  Result: {result.total_mib_s:.1f} MiB/s, Cost: {cost:.2f}/hr, {metric}={metric_value:.2f}"
     )
     print(
-        f"  Timings: deploy={timings.minio_deploy_s:.0f}s, baseline={timings.baseline_s:.0f}s, benchmark={timings.benchmark_s:.0f}s, destroy={timings.minio_destroy_s:.0f}s, total={timings.trial_total_s:.0f}s"
+        f"  Timings: deploy={timings.terraform_s:.0f}s, baseline={timings.baseline_s:.0f}s, benchmark={timings.benchmark_s:.0f}s, destroy={timings.destroy_s:.0f}s, total={timings.trial_total_s:.0f}s"
     )
 
     return metric_value

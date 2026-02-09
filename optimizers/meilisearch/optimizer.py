@@ -110,10 +110,11 @@ class TrialTimings:
 
     terraform_s: float = 0.0  # Terraform apply
     vm_ready_s: float = 0.0  # Wait for VM cloud-init
-    meili_ready_s: float = 0.0  # Wait for Meilisearch service
+    service_ready_s: float = 0.0  # Wait for Meilisearch service
     dataset_gen_s: float = 0.0  # Generate products
     indexing_s: float = 0.0  # Upload and index
     benchmark_s: float = 0.0  # k6 benchmark
+    destroy_s: float = 0.0  # Terraform destroy
     trial_total_s: float = 0.0  # End-to-end trial time
 
 
@@ -517,10 +518,11 @@ def save_result(
         timings_dict = {
             "terraform_s": result.timings.terraform_s,
             "vm_ready_s": result.timings.vm_ready_s,
-            "meili_ready_s": result.timings.meili_ready_s,
+            "service_ready_s": result.timings.service_ready_s,
             "dataset_gen_s": result.timings.dataset_gen_s,
             "indexing_s": result.timings.indexing_s,
             "benchmark_s": result.timings.benchmark_s,
+            "destroy_s": result.timings.destroy_s,
             "trial_total_s": result.timings.trial_total_s,
         }
 

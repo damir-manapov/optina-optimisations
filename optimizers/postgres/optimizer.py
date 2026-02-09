@@ -83,9 +83,10 @@ class TrialTimings:
 
     terraform_s: float = 0.0  # Terraform apply
     vm_ready_s: float = 0.0  # Wait for VM cloud-init
-    pg_ready_s: float = 0.0  # Wait for Postgres service
+    service_ready_s: float = 0.0  # Wait for Postgres service
     pgbench_init_s: float = 0.0  # Initialize pgbench tables
     benchmark_s: float = 0.0  # pgbench run
+    destroy_s: float = 0.0  # Terraform destroy
     trial_total_s: float = 0.0  # End-to-end trial time
 
 
@@ -668,9 +669,10 @@ def save_result(
         timings_dict = {
             "terraform_s": result.timings.terraform_s,
             "vm_ready_s": result.timings.vm_ready_s,
-            "pg_ready_s": result.timings.pg_ready_s,
+            "service_ready_s": result.timings.service_ready_s,
             "pgbench_init_s": result.timings.pgbench_init_s,
             "benchmark_s": result.timings.benchmark_s,
+            "destroy_s": result.timings.destroy_s,
             "trial_total_s": result.timings.trial_total_s,
         }
 
