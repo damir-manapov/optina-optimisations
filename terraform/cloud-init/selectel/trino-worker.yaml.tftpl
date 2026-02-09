@@ -7,7 +7,7 @@ write_files:
   - path: /etc/trino/node.properties
     content: |
       node.environment=benchmark
-      node.id=trino-worker-$${HOSTNAME##*-}
+      node.id=trino-worker-${worker_index}
       node.data-dir=/data/trino
     permissions: '0644'
 
@@ -54,7 +54,7 @@ write_files:
       s3.region=us-east-1
       s3.path-style-access=true
       s3.aws-access-key=minioadmin
-      s3.aws-secret-key=minioadmin
+      s3.aws-secret-key=${minio_password}
     permissions: '0644'
 
   # Trino systemd service

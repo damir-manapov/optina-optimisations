@@ -110,7 +110,7 @@ write_files:
       s3.region=us-east-1
       s3.path-style-access=true
       s3.aws-access-key=minioadmin
-      s3.aws-secret-key=minioadmin
+      s3.aws-secret-key=${minio_password}
     permissions: '0644'
 
   # Trino systemd service
@@ -322,7 +322,7 @@ runcmd:
       echo "Waiting for external MinIO... ($i/60)"
       sleep 3
     done
-    /usr/local/bin/mc alias set minio ${minio_endpoint} minioadmin minioadmin
+    /usr/local/bin/mc alias set minio ${minio_endpoint} minioadmin ${minio_password}
     /usr/local/bin/mc mb minio/warehouse --ignore-existing
     echo "MinIO bucket 'warehouse' created"
 %{ endif ~}
@@ -360,9 +360,10 @@ runcmd:
   - |
     echo "Waiting for ${length(worker_ips)} workers to join..."
     for i in $(seq 1 120); do
-      WORKERS=$(java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute "SELECT count(*) FROM system.runtime.nodes WHERE coordinator = false" 2>/dev/null | tail -1 | tr -d '"' || echo "0")
+      WORKERS=$(java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute "SELECT count(*) FROM system.runtime.nodes WHERE coordinator = false" 2>/dev/null | grep -E '^"?[0-9]+"?$' | tr -d '"' | head -1)
+      WORKERS=$${WORKERS:-0}
       if [ "$WORKERS" -ge "${length(worker_ips)}" ]; then
-        echo "All workers joined"
+        echo "All workers joined ($WORKERS/${length(worker_ips)})"
         break
       fi
       echo "Workers: $WORKERS/${length(worker_ips)} ($i/120)"

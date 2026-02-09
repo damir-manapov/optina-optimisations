@@ -196,6 +196,7 @@ locals {
       worker_ips       = local.trino_worker_ips
       minio_endpoint   = local.trino_minio_endpoint
       minio_internal   = var.minio_enabled
+      minio_password   = var.minio_enabled ? var.minio_root_password : "minioadmin"
     }
   ) : ""
 }
@@ -284,15 +285,19 @@ resource "openstack_networking_port_v2" "trino_worker" {
 }
 
 locals {
-  trino_worker_cloud_init = var.trino_enabled && local.trino_is_cluster ? templatefile(
-    "${path.module}/../cloud-init/selectel/trino-worker.yaml.tftpl",
-    {
-      trino_ram_gb   = local.trino_worker_actual_ram_gb
-      trino_cpu      = local.trino_worker_actual_cpu
-      coordinator_ip = local.trino_coordinator_ip
-      minio_endpoint = local.trino_minio_endpoint
-    }
-  ) : ""
+  trino_worker_cloud_init = var.trino_enabled && local.trino_is_cluster ? [
+    for i in range(local.trino_worker_count) : templatefile(
+      "${path.module}/../cloud-init/selectel/trino-worker.yaml.tftpl",
+      {
+        trino_ram_gb   = local.trino_worker_actual_ram_gb
+        trino_cpu      = local.trino_worker_actual_cpu
+        coordinator_ip = local.trino_coordinator_ip
+        minio_endpoint = local.trino_minio_endpoint
+        minio_password = var.minio_enabled ? var.minio_root_password : "minioadmin"
+        worker_index   = i + 1
+      }
+    )
+  ] : []
 }
 
 resource "openstack_compute_instance_v2" "trino_worker" {
@@ -302,7 +307,7 @@ resource "openstack_compute_instance_v2" "trino_worker" {
   flavor_id         = length(openstack_compute_flavor_v2.trino_worker) > 0 ? openstack_compute_flavor_v2.trino_worker[0].id : openstack_compute_flavor_v2.trino_coordinator[0].id
   key_pair          = selectel_vpc_keypair_v2.benchmark.name
   availability_zone = var.availability_zone
-  user_data         = local.trino_worker_cloud_init
+  user_data         = local.trino_worker_cloud_init[count.index]
 
   network {
     port = openstack_networking_port_v2.trino_worker[count.index].id
