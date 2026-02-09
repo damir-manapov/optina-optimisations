@@ -33,6 +33,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from cloud_config import CloudConfig, get_cloud_config
 from common import (
+    InfraTimings,
     destroy_all,
     get_metric,
     get_terraform,
@@ -102,15 +103,6 @@ def get_config_search_space() -> dict[str, list[int]]:
         "max_indexing_memory_mb": [256, 512, 1024, 2048],
         "max_indexing_threads": [0, 2, 4, 8],  # 0 = auto
     }
-
-
-@dataclass
-class InfraTimings:
-    """Timing breakdown for infrastructure creation."""
-
-    terraform_s: float = 0.0  # Terraform apply
-    vm_ready_s: float = 0.0  # Wait for VM cloud-init
-    service_ready_s: float = 0.0  # Wait for service health
 
 
 @dataclass
@@ -452,7 +444,9 @@ def ensure_infra(
     timings.service_ready_s = time.time() - svc_start
 
     total = timings.terraform_s + timings.vm_ready_s + timings.service_ready_s
-    print(f"  Infrastructure ready in {total:.0f}s (tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s)")
+    print(
+        f"  Infrastructure ready in {total:.0f}s (tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s)"
+    )
 
     return benchmark_ip, meili_ip, timings
 

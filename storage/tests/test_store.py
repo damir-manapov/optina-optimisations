@@ -168,7 +168,9 @@ class TestTrialStoreFind:
         assert len(timeweb_trials) == 1
         assert timeweb_trials[0].cloud == "timeweb"
 
-    def test_find_successful_only(self, redis_store: TrialStore, sample_redis_dict: dict):
+    def test_find_successful_only(
+        self, redis_store: TrialStore, sample_redis_dict: dict
+    ):
         """Find with successful_only should exclude failed trials."""
         redis_store.add_dict(sample_redis_dict)
 

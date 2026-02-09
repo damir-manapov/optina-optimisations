@@ -2,12 +2,27 @@
 
 import subprocess
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from python_terraform import Terraform
 
 # Re-export pricing for backward compatibility
 from pricing import CloudPricing, get_cloud_pricing  # noqa: F401
+
+
+# ============================================================================
+# Timing Dataclasses
+# ============================================================================
+
+
+@dataclass
+class InfraTimings:
+    """Timing breakdown for infrastructure deployment phases."""
+
+    terraform_s: float = 0.0  # Terraform apply
+    vm_ready_s: float = 0.0  # Wait for VM cloud-init/SSH
+    service_ready_s: float = 0.0  # Wait for service health
 
 
 # ============================================================================

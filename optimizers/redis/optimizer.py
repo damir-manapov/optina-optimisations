@@ -29,6 +29,7 @@ from optuna.samplers import TPESampler
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from common import (
+    InfraTimings,
     clear_known_hosts_on_vm,
     destroy_all,
     get_metric,
@@ -227,15 +228,6 @@ class MemtierResult:
 
 
 @dataclass
-class DeployTimings:
-    """Timing breakdown for deploy phase."""
-
-    terraform_s: float = 0.0  # Terraform apply
-    vm_ready_s: float = 0.0  # Wait for VM cloud-init (N/A for Redis - uses benchmark VM)
-    service_ready_s: float = 0.0  # Wait for service health
-
-
-@dataclass
 class TrialTimings:
     """Timing measurements for each phase of a trial."""
 
@@ -422,7 +414,9 @@ def wait_for_redis_ready(
                     f"ssh -A -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@{redis_ip} "
                     f"'echo ok'"
                 )
-                code, _ = run_ssh_command(vm_ip, ssh_cmd, timeout=15, forward_agent=True)
+                code, _ = run_ssh_command(
+                    vm_ip, ssh_cmd, timeout=15, forward_agent=True
+                )
                 if code == 0:
                     vm_ready_time = elapsed
                     ssh_ready = True
@@ -506,10 +500,10 @@ def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
 
 def deploy_redis(
     config: dict, cloud_config: CloudConfig, vm_ip: str
-) -> tuple[bool, DeployTimings]:
+) -> tuple[bool, InfraTimings]:
     """Deploy Redis with given configuration. Returns (success, timings)."""
     print(f"  Deploying Redis on {cloud_config.name}: {config}")
-    timings = DeployTimings()
+    timings = InfraTimings()
     tf_start = time.time()
 
     tf = get_terraform(cloud_config.terraform_dir)
@@ -540,7 +534,9 @@ def deploy_redis(
         print("  Warning: Redis may not be fully ready")
 
     total = timings.terraform_s + timings.vm_ready_s + timings.service_ready_s
-    print(f"  Redis deployed in {total:.1f}s (tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s)")
+    print(
+        f"  Redis deployed in {total:.1f}s (tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s)"
+    )
     return True, timings
 
 

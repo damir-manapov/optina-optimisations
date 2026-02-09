@@ -29,6 +29,7 @@ from optuna.samplers import TPESampler
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from common import (
+    InfraTimings,
     clear_known_hosts_on_vm,
     clear_terraform_state,
     destroy_all,
@@ -252,15 +253,6 @@ class SystemBaseline:
 
     fio: FioResult | None = None
     sysbench: SysbenchResult | None = None
-
-
-@dataclass
-class DeployTimings:
-    """Timing breakdown for deploy phase."""
-
-    terraform_s: float = 0.0  # Terraform apply
-    vm_ready_s: float = 0.0  # Wait for VM cloud-init
-    service_ready_s: float = 0.0  # Wait for service health
 
 
 @dataclass
@@ -596,7 +588,7 @@ def is_ip_conflict_error(stderr: str | None) -> bool:
 
 def deploy_minio(
     config: dict, cloud_config: CloudConfig, vm_ip: str, max_retries: int = 3
-) -> tuple[bool, float]:
+) -> tuple[bool, InfraTimings]:
     """Deploy MinIO cluster with given configuration. Returns (success, timings).
 
     Args:
@@ -606,7 +598,7 @@ def deploy_minio(
         max_retries: Number of retries for transient errors
     """
     print(f"  Deploying MinIO on {cloud_config.name}: {config}")
-    timings = DeployTimings()
+    timings = InfraTimings()
     tf_start = time.time()
 
     tf = get_terraform(cloud_config.terraform_dir)
@@ -667,7 +659,9 @@ def deploy_minio(
         print("  Warning: MinIO may not be fully ready")
 
     total = timings.terraform_s + timings.vm_ready_s + timings.service_ready_s
-    print(f"  MinIO deployed in {total:.1f}s (tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s)")
+    print(
+        f"  MinIO deployed in {total:.1f}s (tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s)"
+    )
     return True, timings
 
 

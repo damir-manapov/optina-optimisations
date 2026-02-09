@@ -38,6 +38,7 @@ from optuna.samplers import TPESampler
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from common import (
+    InfraTimings,
     destroy_all,
     get_metric,
     get_terraform,
@@ -75,15 +76,6 @@ class Mode(Enum):
     INFRA = "infra"  # Tune VM specs (CPU, RAM, disk)
     CONFIG = "config"  # Tune postgresql.conf (fixed host)
     FULL = "full"  # Both phases
-
-
-@dataclass
-class InfraTimings:
-    """Timing breakdown for infrastructure creation."""
-
-    terraform_s: float = 0.0  # Terraform apply
-    vm_ready_s: float = 0.0  # Wait for VM cloud-init
-    service_ready_s: float = 0.0  # Wait for service health
 
 
 @dataclass
@@ -426,7 +418,7 @@ def reconfigure_patroni(
 
 def ensure_infra(
     cloud_config: CloudConfig, infra_config: dict | None = None
-) -> tuple[str, str]:
+) -> tuple[str, str, InfraTimings]:
     """Ensure Postgres and Benchmark VMs exist. Returns (benchmark_ip, postgres_ip, timings)."""
     print(f"\nChecking infrastructure for {cloud_config.name}...")
     timings = InfraTimings()
@@ -504,7 +496,9 @@ def ensure_infra(
     timings.service_ready_s = time.time() - svc_start
 
     total = timings.terraform_s + timings.vm_ready_s + timings.service_ready_s
-    print(f"  Infrastructure ready in {total:.0f}s (tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s)")
+    print(
+        f"  Infrastructure ready in {total:.0f}s (tf={timings.terraform_s:.0f}s, vm={timings.vm_ready_s:.0f}s, svc={timings.service_ready_s:.0f}s)"
+    )
 
     return benchmark_ip, postgres_ip, timings
 
@@ -554,7 +548,10 @@ def wait_for_postgres_ready(
         try:
             # Check cloud-init complete and pg_isready
             code, output = run_ssh_command(
-                vm_ip, "test -f /root/cloud-init-ready && pg_isready", timeout=10, jump_host=jump_host
+                vm_ip,
+                "test -f /root/cloud-init-ready && pg_isready",
+                timeout=10,
+                jump_host=jump_host,
             )
             if code == 0:
                 print(f"  Postgres is ready! ({time.time() - start:.0f}s)")
@@ -941,7 +938,9 @@ def objective_infra(
 
     # Create VMs
     try:
-        benchmark_ip, postgres_ip, infra_timings = ensure_infra(cloud_config, infra_config)
+        benchmark_ip, postgres_ip, infra_timings = ensure_infra(
+            cloud_config, infra_config
+        )
         timings.terraform_s = infra_timings.terraform_s
         timings.vm_ready_s = infra_timings.vm_ready_s
         timings.service_ready_s = infra_timings.service_ready_s
@@ -985,7 +984,14 @@ def objective_infra(
 
     # Save result
     save_result(
-        result, infra_config, pg_config, trial.number, cloud, "infra", cloud_config, login
+        result,
+        infra_config,
+        pg_config,
+        trial.number,
+        cloud,
+        "infra",
+        cloud_config,
+        login,
     )
 
     return get_metric_value(
@@ -1091,7 +1097,14 @@ def objective_config(
 
     # Save result
     save_result(
-        result, infra_config, pg_config, trial.number, cloud, "config", cloud_config, login
+        result,
+        infra_config,
+        pg_config,
+        trial.number,
+        cloud,
+        "config",
+        cloud_config,
+        login,
     )
 
     return get_metric_value(

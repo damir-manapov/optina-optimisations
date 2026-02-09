@@ -19,9 +19,13 @@ class InfraConfig(BaseModel):
 
     cpu: int = Field(default=0, ge=0, description="Number of vCPUs")
     ram_gb: int = Field(default=0, ge=0, description="RAM in GB")
-    disk_type: str = Field(default="", description="Disk type (e.g., 'fast', 'universal')")
+    disk_type: str = Field(
+        default="", description="Disk type (e.g., 'fast', 'universal')"
+    )
     disk_size_gb: int = Field(default=0, ge=0, description="Disk size in GB")
-    mode: str | None = Field(default=None, description="Cluster mode (PostgreSQL: single/replica)")
+    mode: str | None = Field(
+        default=None, description="Cluster mode (PostgreSQL: single/replica)"
+    )
 
 
 # ============================================================================
@@ -40,20 +44,34 @@ class Timings(BaseModel):
     trial_total_s: float = Field(default=0.0, ge=0, description="Total trial time")
 
     # Redis-specific
-    redis_deploy_s: float = Field(default=0.0, ge=0, description="Redis deployment time")
+    redis_deploy_s: float = Field(
+        default=0.0, ge=0, description="Redis deployment time"
+    )
 
     # MinIO-specific
-    minio_deploy_s: float = Field(default=0.0, ge=0, description="MinIO deployment time")
-    minio_destroy_s: float = Field(default=0.0, ge=0, description="MinIO destruction time")
-    baseline_s: float = Field(default=0.0, ge=0, description="Baseline benchmarks (fio/sysbench)")
+    minio_deploy_s: float = Field(
+        default=0.0, ge=0, description="MinIO deployment time"
+    )
+    minio_destroy_s: float = Field(
+        default=0.0, ge=0, description="MinIO destruction time"
+    )
+    baseline_s: float = Field(
+        default=0.0, ge=0, description="Baseline benchmarks (fio/sysbench)"
+    )
 
     # PostgreSQL-specific
     pg_ready_s: float = Field(default=0.0, ge=0, description="PostgreSQL ready time")
-    pgbench_init_s: float = Field(default=0.0, ge=0, description="pgbench initialization time")
+    pgbench_init_s: float = Field(
+        default=0.0, ge=0, description="pgbench initialization time"
+    )
 
     # Meilisearch-specific
-    meili_ready_s: float = Field(default=0.0, ge=0, description="Meilisearch ready time")
-    dataset_gen_s: float = Field(default=0.0, ge=0, description="Dataset generation time")
+    meili_ready_s: float = Field(
+        default=0.0, ge=0, description="Meilisearch ready time"
+    )
+    dataset_gen_s: float = Field(
+        default=0.0, ge=0, description="Dataset generation time"
+    )
     indexing_s: float = Field(default=0.0, ge=0, description="Indexing time")
 
     # Shared by PostgreSQL and Meilisearch
@@ -159,11 +177,17 @@ class Trial(BaseModel):
     # Infrastructure - each service uses different field names
     # Meilisearch uses "infra", PostgreSQL uses "infra_config"
     infra: InfraConfig | None = Field(default=None, description="Infra (Meilisearch)")
-    infra_config: InfraConfig | None = Field(default=None, description="Infra (PostgreSQL)")
+    infra_config: InfraConfig | None = Field(
+        default=None, description="Infra (PostgreSQL)"
+    )
 
     # Service configuration - varies per service, stored as dict
-    config: dict[str, Any] | None = Field(default=None, description="Redis/MinIO/Meilisearch config")
-    pg_config: dict[str, Any] | None = Field(default=None, description="PostgreSQL config")
+    config: dict[str, Any] | None = Field(
+        default=None, description="Redis/MinIO/Meilisearch config"
+    )
+    pg_config: dict[str, Any] | None = Field(
+        default=None, description="PostgreSQL config"
+    )
 
     # Metrics - nested under metrics field
     metrics: Metrics | None = Field(default=None, description="Performance metrics")
@@ -178,7 +202,9 @@ class Trial(BaseModel):
     timings: Timings | None = Field(default=None, description="Timing measurements")
 
     # MinIO-specific baseline
-    system_baseline: SystemBaseline | None = Field(default=None, description="System baseline (MinIO)")
+    system_baseline: SystemBaseline | None = Field(
+        default=None, description="System baseline (MinIO)"
+    )
 
     def is_successful(self) -> bool:
         """Check if trial completed successfully."""
