@@ -314,7 +314,9 @@ def find_cached_result(config: dict, cloud: str) -> dict | None:
     return result
 
 
-def load_historical_trials(study: optuna.Study, cloud: str, metric: str) -> int:
+def load_historical_trials(
+    study: optuna.Study, cloud: str, metric: str, mode: str = "cluster"
+) -> int:
     """Load historical results into Optuna study as completed trials.
 
     This helps Optuna make better suggestions by learning from past results.
@@ -337,7 +339,13 @@ def load_historical_trials(study: optuna.Study, cloud: str, metric: str) -> int:
     if not valid_results:
         return 0
 
-    config_space = get_config_space(cloud)
+    # Get appropriate search space based on mode
+    if mode == "config":
+        config_space = get_config_space(cloud)
+    elif mode == "infra":
+        config_space = get_infra_search_space(cloud)
+    else:  # cluster mode
+        config_space = get_cluster_search_space(cloud)
     loaded = 0
     seen_configs = set()
 
@@ -357,54 +365,97 @@ def load_historical_trials(study: optuna.Study, cloud: str, metric: str) -> int:
         drive_size = config.get("drive_size_gb")
         drive_type = config.get("drive_type")
 
-        # Validate all values are in search space
-        if nodes not in config_space["nodes"]:
-            continue
-        if cpu not in config_space["cpu_per_node"]:
-            continue
-        if drives not in config_space["drives_per_node"]:
-            continue
-        if drive_size not in config_space["drive_size_gb"]:
-            continue
-        if drive_type not in config_space["drive_type"]:
-            continue
+        # Validate values based on mode
+        if mode == "config":
+            # Config mode: only storage params
+            if drives not in config_space["drives_per_node"]:
+                continue
+            if drive_size not in config_space["drive_size_gb"]:
+                continue
+            if drive_type not in config_space["drive_type"]:
+                continue
 
-        # Check RAM is valid for this CPU
-        valid_ram = filter_valid_ram(cloud, cpu, config_space["ram_per_node"])
-        if ram not in valid_ram:
-            continue
+            params = {
+                "drives_per_node": drives,
+                "drive_size_gb": drive_size,
+                "drive_type": drive_type,
+            }
+            distributions = {
+                "drives_per_node": optuna.distributions.CategoricalDistribution(
+                    config_space["drives_per_node"]
+                ),
+                "drive_size_gb": optuna.distributions.CategoricalDistribution(
+                    config_space["drive_size_gb"]
+                ),
+                "drive_type": optuna.distributions.CategoricalDistribution(
+                    config_space["drive_type"]
+                ),
+            }
+        elif mode == "infra":
+            # Infra mode: VM specs only
+            if cpu not in config_space["cpu_per_node"]:
+                continue
+            valid_ram = filter_valid_ram(cloud, cpu, config_space["ram_per_node"])
+            if ram not in valid_ram:
+                continue
 
-        # Build params with CPU-specific RAM param name (matches objective function)
-        params = {
-            "nodes": nodes,
-            "cpu_per_node": cpu,
-            f"ram_per_node_cpu{cpu}": ram,
-            "drives_per_node": drives,
-            "drive_size_gb": drive_size,
-            "drive_type": drive_type,
-        }
+            params = {
+                "cpu_per_node": cpu,
+                f"ram_per_node_cpu{cpu}": ram,
+            }
+            distributions = {
+                "cpu_per_node": optuna.distributions.CategoricalDistribution(
+                    config_space["cpu_per_node"]
+                ),
+                f"ram_per_node_cpu{cpu}": optuna.distributions.CategoricalDistribution(
+                    valid_ram
+                ),
+            }
+        else:
+            # Cluster mode: all params
+            if nodes not in config_space["nodes"]:
+                continue
+            if cpu not in config_space["cpu_per_node"]:
+                continue
+            if drives not in config_space["drives_per_node"]:
+                continue
+            if drive_size not in config_space["drive_size_gb"]:
+                continue
+            if drive_type not in config_space["drive_type"]:
+                continue
 
-        # Build distributions
-        distributions = {
-            "nodes": optuna.distributions.CategoricalDistribution(
-                config_space["nodes"]
-            ),
-            "cpu_per_node": optuna.distributions.CategoricalDistribution(
-                config_space["cpu_per_node"]
-            ),
-            f"ram_per_node_cpu{cpu}": optuna.distributions.CategoricalDistribution(
-                valid_ram
-            ),
-            "drives_per_node": optuna.distributions.CategoricalDistribution(
-                config_space["drives_per_node"]
-            ),
-            "drive_size_gb": optuna.distributions.CategoricalDistribution(
-                config_space["drive_size_gb"]
-            ),
-            "drive_type": optuna.distributions.CategoricalDistribution(
-                config_space["drive_type"]
-            ),
-        }
+            valid_ram = filter_valid_ram(cloud, cpu, config_space["ram_per_node"])
+            if ram not in valid_ram:
+                continue
+
+            params = {
+                "nodes": nodes,
+                "cpu_per_node": cpu,
+                f"ram_per_node_cpu{cpu}": ram,
+                "drives_per_node": drives,
+                "drive_size_gb": drive_size,
+                "drive_type": drive_type,
+            }
+            distributions = {
+                "nodes": optuna.distributions.CategoricalDistribution(
+                    config_space["nodes"]
+                ),
+                "cpu_per_node": optuna.distributions.CategoricalDistribution(
+                    config_space["cpu_per_node"]
+                ),
+                f"ram_per_node_cpu{cpu}": optuna.distributions.CategoricalDistribution(
+                    valid_ram
+                ),
+                "drives_per_node": optuna.distributions.CategoricalDistribution(
+                    config_space["drives_per_node"]
+                ),
+                "drive_size_gb": optuna.distributions.CategoricalDistribution(
+                    config_space["drive_size_gb"]
+                ),
+                "drive_type": optuna.distributions.CategoricalDistribution(
+                    config_space["drive_type"]
+                ),
+            }
 
         # Calculate metric value
         value = get_metric_value(result, metric, METRICS)
@@ -1360,7 +1411,7 @@ Examples:
     )
 
     # Load historical results into study for better suggestions
-    n_loaded = load_historical_trials(study, args.cloud, args.metric)
+    n_loaded = load_historical_trials(study, args.cloud, args.metric, args.mode)
     if n_loaded > 0:
         print(f"Loaded {n_loaded} historical trials from results.json")
 
