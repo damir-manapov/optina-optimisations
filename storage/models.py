@@ -195,6 +195,13 @@ class Trial(BaseModel):
     pg_config: dict[str, Any] | None = Field(
         default=None, description="PostgreSQL config"
     )
+    trino_config: dict[str, Any] | None = Field(
+        default=None, description="Trino-Iceberg config (heap, compression, etc.)"
+    )
+    cluster_config: dict[str, Any] | None = Field(
+        default=None,
+        description="Cluster topology config (trino workers, minio cluster, etc.)",
+    )
 
     # Metrics - nested under metrics field
     metrics: Metrics | None = Field(default=None, description="Performance metrics")
@@ -226,6 +233,8 @@ class Trial(BaseModel):
             return m is not None and (m.tps or 0) > 0
         if self.service == "minio":
             return m is not None and (m.total_mib_s or 0) > 0
+        if self.service == "trino-iceberg":
+            return m is not None and (m.lookup_by_id_per_sec or 0) > 0
         return False
 
     def get_primary_metric(self) -> float:
@@ -241,6 +250,8 @@ class Trial(BaseModel):
             return m.tps or 0
         if self.service == "minio":
             return m.total_mib_s or 0
+        if self.service == "trino-iceberg":
+            return m.lookup_by_id_per_sec or 0
         return 0
 
     def get_config_key(self) -> dict[str, Any]:
@@ -284,5 +295,15 @@ class Trial(BaseModel):
                 "cloud": self.cloud,
                 "infra": infra,
                 "config": self.config,
+            }
+        if self.service == "trino-iceberg":
+            infra = self.infra_config.model_dump() if self.infra_config else {}
+            # Include cluster_config in the key if present
+            if self.cluster_config:
+                infra = {**infra, "cluster": self.cluster_config}
+            return {
+                "cloud": self.cloud,
+                "infra": infra,
+                "trino": self.trino_config,
             }
         return {"cloud": self.cloud}

@@ -664,6 +664,7 @@ def save_result(
     mode: str,
     cloud_config: CloudConfig,
     login: str,
+    cluster_config: dict | None = None,
 ) -> None:
     """Save benchmark result to JSON file."""
     store = get_store()
@@ -710,6 +711,7 @@ def save_result(
             "mode": mode,
             "infra_config": infra_config,
             "trino_config": trino_config,
+            "cluster_config": cluster_config,
             "metrics": {
                 "lookup_by_id_per_sec": result.lookup_by_id_per_sec,
                 "lookup_by_id_p50_ms": result.lookup_by_id_p50_ms,
@@ -1093,13 +1095,14 @@ def objective_cluster(
         # Include cluster config in saved result
         save_result(
             result,
-            {**infra_config, "cluster": cluster_config},
+            infra_config,
             trino_config,
             trial.number,
             cloud,
             "cluster",
             cloud_config,
             login,
+            cluster_config=cluster_config,
         )
 
         return get_metric_value(
