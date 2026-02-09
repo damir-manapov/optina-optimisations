@@ -91,7 +91,7 @@ uv run python optimizers/trino_iceberg/optimizer.py -c selectel --export-md
 Point lookup by ID benchmark using concurrent queries:
 - Query: `SELECT * FROM benchmark WHERE id = ?`
 - Random IDs from dataset
-- Concurrency: 2 × CPU cores
+- Concurrency: 16 (fixed for fair comparison)
 - Duration: 60 seconds
 
 ## Data Generation

@@ -723,7 +723,7 @@ def objective_infra(
 
         # Run benchmark
         bench_start = time.time()
-        result = run_lookup_by_id_benchmark(trino_ip, duration=60, concurrency=cpu * 2, jump_host=benchmark_ip)
+        result = run_lookup_by_id_benchmark(trino_ip, duration=60, concurrency=16, jump_host=benchmark_ip)
         timings.benchmark_s = time.time() - bench_start
 
         result.baseline = baseline
@@ -812,8 +812,7 @@ def objective_config(
 
         # Run benchmark
         bench_start = time.time()
-        cpu = fixed_infra.get("cpu", 4)
-        result = run_lookup_by_id_benchmark(trino_ip, duration=60, concurrency=cpu * 2, jump_host=benchmark_ip)
+        result = run_lookup_by_id_benchmark(trino_ip, duration=60, concurrency=16, jump_host=benchmark_ip)
         timings.benchmark_s = time.time() - bench_start
 
         result.timings = timings
