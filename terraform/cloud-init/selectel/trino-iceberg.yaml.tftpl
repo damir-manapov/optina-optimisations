@@ -7,7 +7,6 @@ packages:
   - curl
   - wget
   - jq
-  - openjdk-21-jdk-headless
   - postgresql-16
   - postgresql-client-16
   - git
@@ -36,7 +35,7 @@ write_files:
       [Service]
       Type=simple
       User=nessie
-      Environment="JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64"
+      Environment="JAVA_HOME=/usr/lib/jvm/temurin-23-jdk-amd64"
       Environment="NESSIE_VERSION=0.99.0"
       Environment="QUARKUS_DATASOURCE_JDBC_URL=jdbc:postgresql://localhost:5432/nessie"
       Environment="QUARKUS_DATASOURCE_USERNAME=nessie"
@@ -82,7 +81,6 @@ write_files:
       query.max-memory-per-node=${floor(trino_ram_gb * 0.4)}GB
       discovery.uri=http://localhost:8080
       task.concurrency=16
-      task.writer-count=2
     permissions: '0644'
 
   # Trino log.properties
@@ -112,7 +110,7 @@ write_files:
       Type=forking
       User=trino
       Group=trino
-      Environment="JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64"
+      Environment="JAVA_HOME=/usr/lib/jvm/temurin-23-jdk-amd64"
       ExecStart=/opt/trino/bin/launcher start
       ExecStop=/opt/trino/bin/launcher stop
       Restart=on-failure
@@ -130,6 +128,15 @@ write_files:
     permissions: '0755'
 
 runcmd:
+  # Install Temurin Java 22 (Trino 467+ requires Java 22+)
+  - |
+    wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor -o /usr/share/keyrings/adoptium.gpg
+    echo "deb [signed-by=/usr/share/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb $(lsb_release -cs) main" > /etc/apt/sources.list.d/adoptium.list
+    apt-get update
+    apt-get install -y temurin-23-jdk
+    update-alternatives --set java /usr/lib/jvm/temurin-23-jdk-amd64/bin/java
+    echo "JAVA_HOME=/usr/lib/jvm/temurin-23-jdk-amd64" >> /etc/environment
+
   # Format and mount data volume
   - |
     if [ -b /dev/vdb ]; then
@@ -170,23 +177,37 @@ runcmd:
     chmod +x bin/nessie-quarkus-runner
     chown -R nessie:nessie /opt/nessie
 
-  # Download and install Trino
+  # Download and install Trino (large ~850MB download, use retries)
   - |
     cd /opt
     TRINO_VERSION=467
-    wget -q https://repo1.maven.org/maven2/io/trino/trino-server/$TRINO_VERSION/trino-server-$TRINO_VERSION.tar.gz
-    tar -xzf trino-server-$TRINO_VERSION.tar.gz
+    TRINO_URL="https://repo1.maven.org/maven2/io/trino/trino-server/$TRINO_VERSION/trino-server-$TRINO_VERSION.tar.gz"
+    TRINO_CLI_URL="https://repo1.maven.org/maven2/io/trino/trino-cli/$TRINO_VERSION/trino-cli-$TRINO_VERSION-executable.jar"
+
+    echo "Downloading Trino server (~850MB)..."
+    for i in 1 2 3; do
+      if wget --progress=dot:giga -t 3 -c "$TRINO_URL" -O trino-server.tar.gz; then
+        break
+      fi
+      echo "Retry $i/3 for Trino download..."
+      sleep 10
+    done
+
+    echo "Extracting Trino..."
+    tar -xzf trino-server.tar.gz
     mv trino-server-$TRINO_VERSION/* trino/
-    rm -rf trino-server-$TRINO_VERSION trino-server-$TRINO_VERSION.tar.gz
-    
+    rm -rf trino-server-$TRINO_VERSION trino-server.tar.gz
+
     # Download Trino CLI
-    wget -q https://repo1.maven.org/maven2/io/trino/trino-cli/$TRINO_VERSION/trino-cli-$TRINO_VERSION-executable.jar -O trino/trino-cli.jar
-    
+    echo "Downloading Trino CLI..."
+    wget -q -t 3 "$TRINO_CLI_URL" -O trino/trino-cli.jar
+
     # Link config
     rm -rf /opt/trino/etc
     ln -s /etc/trino /opt/trino/etc
-    
+
     chown -R trino:trino /opt/trino
+    echo "Trino installation complete"
 
   # Install Node.js and pnpm for samples-generation
   - |

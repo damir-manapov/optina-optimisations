@@ -153,7 +153,7 @@ def wait_for_trino_ready(
     while time.time() - start < timeout:
         # Check Trino health endpoint
         cmd = f"curl -s -o /dev/null -w '%{{http_code}}' http://localhost:{TRINO_PORT}/v1/info"
-        code, output = run_ssh_command(vm_ip, cmd, timeout=10, jump_host=jump_host)
+        code, output = run_ssh_command(vm_ip, cmd, timeout=30, jump_host=jump_host)
         if code == 0 and output.strip() == "200":
             # Also verify we can run a simple query
             test_cmd = "trino --execute 'SELECT 1' 2>/dev/null"

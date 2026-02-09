@@ -27,8 +27,8 @@ def get_infra_search_space(cloud: str) -> dict:
     For simplicity, we optimize single-node Trino with co-located services.
     """
     return {
-        "cpu": [2, 4, 8, 16],
-        "ram_gb": [8, 16, 32, 64],  # Trino needs more RAM
+        "cpu": [4, 8, 16],  # Min 4 CPU for Trino JVM + downloads
+        "ram_gb": [16, 32, 64],  # Min 16GB for Trino heap
         "disk_type": ["nvme"] if cloud == "timeweb" else ["fast"],
         "disk_size_gb": [100, 200, 400],  # Iceberg tables can be large
     }
