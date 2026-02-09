@@ -196,6 +196,7 @@ class TrialTimings:
     terraform_s: float = 0.0      # Terraform apply
     vm_ready_s: float = 0.0       # Wait for VM cloud-init
     service_ready_s: float = 0.0  # Wait for service to start
+    baseline_s: float = 0.0       # fio + sysbench tests
     data_load_s: float = 0.0      # Load test data (indexing, pgbench init, etc.)
     benchmark_s: float = 0.0      # Run benchmark
     trial_total_s: float = 0.0    # End-to-end trial time
@@ -209,11 +210,40 @@ infra_start = time.time()
 benchmark_ip, service_ip = ensure_infra(cloud_config, infra_config)
 timings.terraform_s = time.time() - infra_start
 
+# Run system baseline
+baseline_start = time.time()
+baseline = run_system_baseline(service_ip, jump_host=benchmark_ip)
+timings.baseline_s = time.time() - baseline_start
+
 # ... run benchmark ...
 
 timings.trial_total_s = time.time() - trial_start
 result.timings = timings
+result.baseline = baseline
 ```
+
+### System Baseline
+
+Before running service benchmarks, all optimizers run fio and sysbench on the target VM to measure hardware capabilities. This helps identify variance between VMs with the same specs.
+
+```python
+from common import run_system_baseline, SystemBaseline
+
+# In objective function, after ensure_infra():
+baseline = run_system_baseline(
+    target_ip=service_ip,
+    jump_host=benchmark_ip,  # Optional, for multi-VM setups
+    test_path="/data",       # Where to run fio (default: /tmp)
+)
+
+# baseline contains:
+# - fio: FioResult (rand_read_iops, rand_write_iops, seq_read_mib_s, seq_write_mib_s)
+# - sysbench: SysbenchResult (cpu_events_per_sec, memory_mib_per_sec)
+```
+
+**What it measures:**
+- **fio**: Random 4K read/write IOPS, sequential 1M read/write throughput
+- **sysbench**: CPU events/sec (prime calculation), memory bandwidth (MiB/s)
 
 ### Benchmark Result Dataclass
 
@@ -234,6 +264,9 @@ class BenchmarkResult:
 
     # Timing data (required)
     timings: TrialTimings | None = None
+
+    # System baseline (fio + sysbench)
+    baseline: SystemBaseline | None = None
 
     def is_valid(self) -> bool:
         return self.error is None and self.throughput > 0
@@ -310,6 +343,7 @@ def save_result(cloud: str, infra: dict, config: dict,
         timings_dict = {
             "terraform_s": result.timings.terraform_s,
             "vm_ready_s": result.timings.vm_ready_s,
+            "baseline_s": result.timings.baseline_s,
             "benchmark_s": result.timings.benchmark_s,
             "trial_total_s": result.timings.trial_total_s,
         }
@@ -607,19 +641,33 @@ raise optuna.TrialPruned()  # Not raise RuntimeError
 | `get_tf_output()`                   | Get Terraform output value         |
 | `destroy_all()`                     | Destroy all Terraform resources    |
 | `load_results()` / `save_results()` | JSON cache I/O                     |
+| `run_system_baseline()`             | Run fio + sysbench on target VM    |
+| `run_fio_baseline()`                | Disk I/O benchmark (4K random, 1M seq) |
+| `run_sysbench_baseline()`           | CPU + memory benchmark             |
+
+### Shared Dataclasses (common.py)
+
+| Dataclass        | Purpose                                      |
+| ---------------- | -------------------------------------------- |
+| `InfraTimings`   | Terraform/VM ready/service ready timing      |
+| `FioResult`      | Disk benchmark results (IOPS, throughput)    |
+| `SysbenchResult` | CPU events/s, memory bandwidth               |
+| `SystemBaseline` | Combined fio + sysbench results              |
 
 ## Checklist for New Optimizer
 
 - [ ] `CloudConfig` dataclass with terraform directory and pricing (use `get_cloud_pricing()`)
-- [ ] `BenchmarkResult` dataclass with all metrics and `timings: TrialTimings`
-- [ ] `TrialTimings` dataclass for phase timing
+- [ ] `BenchmarkResult` dataclass with all metrics, `timings: TrialTimings`, and `baseline: SystemBaseline`
+- [ ] `TrialTimings` dataclass for phase timing (including `baseline_s`)
 - [ ] `calculate_cost()` using common pricing rates
 - [ ] `get_infra_search_space()` and `get_config_search_space()`
 - [ ] `results_file()`, `config_to_key()`, `find_cached_result()`, `save_result()`
 - [ ] `ensure_infra()` with VM validation
+- [ ] `run_system_baseline()` call after infrastructure is ready
 - [ ] `run_benchmark()` with timeout handling
 - [ ] `parse_*_output()` with error handling
 - [ ] `objective_infra()` with `filter_valid_ram()` for cloud constraints
 - [ ] `objective_config()` (or single `objective()`)
 - [ ] CLI with `--cloud`, `--mode`, `--metric`, `--trials`, `--show-results`, `--destroy`
 - [ ] Trial pruning on failures and cached duplicates
+- [ ] Save `system_baseline` metrics in `save_result()`
