@@ -111,12 +111,12 @@ class TrialTimings:
 
 @dataclass
 class BenchmarkResult:
-    """Trino lookup benchmark results."""
+    """Trino lookup by ID benchmark results."""
 
-    lookups_per_sec: float = 0.0
-    lookup_p50_ms: float = 0.0
-    lookup_p95_ms: float = 0.0
-    lookup_p99_ms: float = 0.0
+    lookup_by_id_per_sec: float = 0.0
+    lookup_by_id_p50_ms: float = 0.0
+    lookup_by_id_p95_ms: float = 0.0
+    lookup_by_id_p99_ms: float = 0.0
     total_lookups: int = 0
     duration_s: float = 0.0
     error: str | None = None
@@ -140,7 +140,7 @@ def find_cached_result(infra: dict, trino_config: dict, cloud: str) -> dict | No
         return None
     if trial.error:
         return None
-    lookups = trial.metrics.lookups_per_sec if trial.metrics else 0
+    lookups = trial.metrics.lookup_by_id_per_sec if trial.metrics else 0
     if (lookups or 0) <= 0:
         return None
     return trial.model_dump()
@@ -405,13 +405,13 @@ trino --execute "ALTER TABLE iceberg.warehouse.benchmark_opt RENAME TO benchmark
     return True, duration
 
 
-def run_lookup_benchmark(
+def run_lookup_by_id_benchmark(
     vm_ip: str,
     duration: int = 60,
     concurrency: int = 8,
     jump_host: str | None = None,
 ) -> BenchmarkResult:
-    """Run point lookup benchmark against Trino.
+    """Run point lookup by ID benchmark against Trino.
 
     Executes random ID lookups: SELECT * FROM benchmark WHERE id = ?
     """
@@ -468,7 +468,7 @@ with ThreadPoolExecutor(max_workers=CONCURRENCY) as executor:
 total_time = time.time() - start_time
 latencies.sort()
 
-print(f"lookups_per_sec={{completed / total_time:.2f}}")
+print(f"lookup_by_id_per_sec={{completed / total_time:.2f}}")
 print(f"p50_ms={{latencies[len(latencies)//2]:.2f}}" if latencies else "p50_ms=0")
 print(f"p95_ms={{latencies[int(len(latencies)*0.95)]:.2f}}" if latencies else "p95_ms=0")
 print(f"p99_ms={{latencies[int(len(latencies)*0.99)]:.2f}}" if latencies else "p99_ms=0")
@@ -502,20 +502,20 @@ def parse_benchmark_output(output: str, duration: float) -> BenchmarkResult:
             continue
         key, value = line.strip().split("=", 1)
         try:
-            if key == "lookups_per_sec":
-                result.lookups_per_sec = float(value)
+            if key == "lookup_by_id_per_sec":
+                result.lookup_by_id_per_sec = float(value)
             elif key == "p50_ms":
-                result.lookup_p50_ms = float(value)
+                result.lookup_by_id_p50_ms = float(value)
             elif key == "p95_ms":
-                result.lookup_p95_ms = float(value)
+                result.lookup_by_id_p95_ms = float(value)
             elif key == "p99_ms":
-                result.lookup_p99_ms = float(value)
+                result.lookup_by_id_p99_ms = float(value)
             elif key == "total_lookups":
                 result.total_lookups = int(value)
         except ValueError:
             continue
 
-    if result.lookups_per_sec == 0:
+    if result.lookup_by_id_per_sec == 0:
         result.error = f"Failed to parse benchmark output: {output[:300]}"
 
     return result
@@ -592,10 +592,10 @@ def save_result(
             "infra_config": infra_config,
             "trino_config": trino_config,
             "metrics": {
-                "lookups_per_sec": result.lookups_per_sec,
-                "lookup_p50_ms": result.lookup_p50_ms,
-                "lookup_p95_ms": result.lookup_p95_ms,
-                "lookup_p99_ms": result.lookup_p99_ms,
+                "lookup_by_id_per_sec": result.lookup_by_id_per_sec,
+                "lookup_by_id_p50_ms": result.lookup_by_id_p50_ms,
+                "lookup_by_id_p95_ms": result.lookup_by_id_p95_ms,
+                "lookup_by_id_p99_ms": result.lookup_by_id_p99_ms,
                 "total_lookups": result.total_lookups,
                 "duration_s": result.duration_s,
             },
@@ -723,7 +723,7 @@ def objective_infra(
 
         # Run benchmark
         bench_start = time.time()
-        result = run_lookup_benchmark(trino_ip, duration=60, concurrency=cpu * 2, jump_host=benchmark_ip)
+        result = run_lookup_by_id_benchmark(trino_ip, duration=60, concurrency=cpu * 2, jump_host=benchmark_ip)
         timings.benchmark_s = time.time() - bench_start
 
         result.baseline = baseline
@@ -735,8 +735,8 @@ def objective_infra(
             raise optuna.TrialPruned()
 
         print(
-            f"  Result: {result.lookups_per_sec:.1f} lookups/s, "
-            f"p50={result.lookup_p50_ms:.1f}ms, p99={result.lookup_p99_ms:.1f}ms"
+            f"  Result: {result.lookup_by_id_per_sec:.1f} lookups/s, "
+            f"p50={result.lookup_by_id_p50_ms:.1f}ms, p99={result.lookup_by_id_p99_ms:.1f}ms"
         )
 
         save_result(
@@ -744,7 +744,7 @@ def objective_infra(
         )
 
         return get_metric_value(
-            {"metrics": {"lookups_per_sec": result.lookups_per_sec}},
+            {"metrics": {"lookup_by_id_per_sec": result.lookup_by_id_per_sec}},
             metric,
             METRICS,
         )
@@ -813,7 +813,7 @@ def objective_config(
         # Run benchmark
         bench_start = time.time()
         cpu = fixed_infra.get("cpu", 4)
-        result = run_lookup_benchmark(trino_ip, duration=60, concurrency=cpu * 2, jump_host=benchmark_ip)
+        result = run_lookup_by_id_benchmark(trino_ip, duration=60, concurrency=cpu * 2, jump_host=benchmark_ip)
         timings.benchmark_s = time.time() - bench_start
 
         result.timings = timings
@@ -824,8 +824,8 @@ def objective_config(
             raise optuna.TrialPruned()
 
         print(
-            f"  Result: {result.lookups_per_sec:.1f} lookups/s, "
-            f"p50={result.lookup_p50_ms:.1f}ms, p99={result.lookup_p99_ms:.1f}ms"
+            f"  Result: {result.lookup_by_id_per_sec:.1f} lookups/s, "
+            f"p50={result.lookup_by_id_p50_ms:.1f}ms, p99={result.lookup_by_id_p99_ms:.1f}ms"
         )
 
         save_result(
@@ -833,7 +833,7 @@ def objective_config(
         )
 
         return get_metric_value(
-            {"metrics": {"lookups_per_sec": result.lookups_per_sec}},
+            {"metrics": {"lookup_by_id_per_sec": result.lookup_by_id_per_sec}},
             metric,
             METRICS,
         )
@@ -865,7 +865,7 @@ def format_results(cloud: str) -> dict | None:
         return None
 
     results_sorted = sorted(
-        results, key=lambda x: get_metric(x, "lookups_per_sec"), reverse=True
+        results, key=lambda x: get_metric(x, "lookup_by_id_per_sec"), reverse=True
     )
 
     rows = []
@@ -874,7 +874,7 @@ def format_results(cloud: str) -> dict | None:
         trino = r.get("trino_config", {})
         cloud_name = r.get("cloud", cloud)
         cost = calculate_cost(infra, cloud_name)
-        lookups = get_metric(r, "lookups_per_sec")
+        lookups = get_metric(r, "lookup_by_id_per_sec")
         eff = lookups / cost if cost > 0 else 0
         rows.append(
             {
@@ -885,8 +885,8 @@ def format_results(cloud: str) -> dict | None:
                 "compression": trino.get("compression", "?"),
                 "partition": trino.get("partition_key", "none"),
                 "lookups": lookups,
-                "p50": get_metric(r, "lookup_p50_ms"),
-                "p99": get_metric(r, "lookup_p99_ms"),
+                "p50": get_metric(r, "lookup_by_id_p50_ms"),
+                "p99": get_metric(r, "lookup_by_id_p99_ms"),
                 "cost": cost,
                 "eff": eff,
             }
@@ -1017,7 +1017,7 @@ Examples:
     add_common_arguments(
         parser,
         metrics=METRICS,
-        default_metric="lookups_per_sec",
+        default_metric="lookup_by_id_per_sec",
         default_trials=20,
         study_prefix="trino-iceberg",
         with_mode=True,
@@ -1136,7 +1136,7 @@ Examples:
                 print("No infra results found, cannot proceed to config optimization")
                 return
 
-            best_result = max(results, key=lambda r: get_metric(r, "lookups_per_sec"))
+            best_result = max(results, key=lambda r: get_metric(r, "lookup_by_id_per_sec"))
             best_infra = best_result.get("infra_config", {})
             print(f"\nBest infra: {infra_summary(best_infra)}")
 

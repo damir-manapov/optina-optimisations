@@ -27,7 +27,7 @@ uv run python optimizers/trino_iceberg/optimizer.py -c selectel -m full -t 20 -l
 uv run python optimizers/trino_iceberg/optimizer.py -c selectel -m infra -t 10 --rows 100000000 -l damir
 
 # Optimize for latency instead of throughput
-uv run python optimizers/trino_iceberg/optimizer.py -c selectel -m config --metric lookup_p99_ms -t 20 -l damir
+uv run python optimizers/trino_iceberg/optimizer.py -c selectel -m config --metric lookup_by_id_p99_ms -t 20 -l damir
 
 # View results
 uv run python optimizers/trino_iceberg/optimizer.py -c selectel --show-results
@@ -78,17 +78,17 @@ uv run python optimizers/trino_iceberg/optimizer.py -c selectel --export-md
 
 ## Metrics
 
-| Metric          | Direction | Description                 |
-| --------------- | --------- | --------------------------- |
-| lookups_per_sec | Maximize  | Point lookups per second    |
-| lookup_p50_ms   | Minimize  | Median lookup latency       |
-| lookup_p95_ms   | Minimize  | 95th percentile latency     |
-| lookup_p99_ms   | Minimize  | 99th percentile latency     |
-| cost_efficiency | Maximize  | Lookups per ₽/mo            |
+| Metric                | Direction | Description                       |
+| --------------------- | --------- | --------------------------------- |
+| lookup_by_id_per_sec  | Maximize  | Point lookups by ID per second    |
+| lookup_by_id_p50_ms   | Minimize  | Median lookup by ID latency       |
+| lookup_by_id_p95_ms   | Minimize  | 95th percentile latency           |
+| lookup_by_id_p99_ms   | Minimize  | 99th percentile latency           |
+| cost_efficiency       | Maximize  | Lookups per ₽/mo                  |
 
 ## Benchmark
 
-Point lookup benchmark using concurrent queries:
+Point lookup by ID benchmark using concurrent queries:
 - Query: `SELECT * FROM benchmark WHERE id = ?`
 - Random IDs from dataset
 - Concurrency: 2 × CPU cores
