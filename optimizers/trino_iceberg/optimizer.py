@@ -771,7 +771,9 @@ def ensure_infra(
             if cluster_config.get("trino_worker_cpu"):
                 tf_vars["trino_worker_cpu"] = str(cluster_config["trino_worker_cpu"])
             if cluster_config.get("trino_worker_ram_gb"):
-                tf_vars["trino_worker_ram_gb"] = str(cluster_config["trino_worker_ram_gb"])
+                tf_vars["trino_worker_ram_gb"] = str(
+                    cluster_config["trino_worker_ram_gb"]
+                )
 
         # MinIO topology
         minio_enabled = cluster_config.get("minio_enabled", False)
@@ -781,7 +783,9 @@ def ensure_infra(
             tf_vars["minio_nodes"] = str(cluster_config.get("minio_nodes", 4))
             tf_vars["minio_cpu"] = str(cluster_config.get("minio_cpu", 2))
             tf_vars["minio_ram_gb"] = str(cluster_config.get("minio_ram_gb", 4))
-            tf_vars["minio_disk_size_gb"] = str(cluster_config.get("minio_disk_size_gb", 50))
+            tf_vars["minio_disk_size_gb"] = str(
+                cluster_config.get("minio_disk_size_gb", 50)
+            )
     else:
         tf_vars["minio_enabled"] = "false"
         tf_vars["trino_topology"] = "solo"
@@ -951,10 +955,14 @@ def objective_cluster(
     valid_ram = filter_valid_ram(cloud, cpu, infra_space["ram_gb"])
     ram_gb = trial.suggest_categorical(f"ram_gb_cpu{cpu}", valid_ram)
     disk_type = trial.suggest_categorical("disk_type", infra_space["disk_type"])
-    disk_size_gb = trial.suggest_categorical("disk_size_gb", infra_space["disk_size_gb"])
+    disk_size_gb = trial.suggest_categorical(
+        "disk_size_gb", infra_space["disk_size_gb"]
+    )
 
     # Sample Trino topology
-    trino_topology = trial.suggest_categorical("trino_topology", cluster_space["trino_topology"])
+    trino_topology = trial.suggest_categorical(
+        "trino_topology", cluster_space["trino_topology"]
+    )
 
     cluster_config = {
         "trino_topology": trino_topology,
@@ -962,35 +970,55 @@ def objective_cluster(
 
     # Cluster-specific parameters
     if trino_topology == "cluster":
-        trino_workers = trial.suggest_categorical("trino_workers", cluster_space["trino_workers"])
-        trino_worker_cpu = trial.suggest_categorical("trino_worker_cpu", cluster_space["trino_worker_cpu"])
-        valid_worker_ram = filter_valid_ram(cloud, trino_worker_cpu, cluster_space["trino_worker_ram_gb"])
+        trino_workers = trial.suggest_categorical(
+            "trino_workers", cluster_space["trino_workers"]
+        )
+        trino_worker_cpu = trial.suggest_categorical(
+            "trino_worker_cpu", cluster_space["trino_worker_cpu"]
+        )
+        valid_worker_ram = filter_valid_ram(
+            cloud, trino_worker_cpu, cluster_space["trino_worker_ram_gb"]
+        )
         trino_worker_ram_gb = trial.suggest_categorical(
             f"trino_worker_ram_gb_cpu{trino_worker_cpu}", valid_worker_ram
         )
-        cluster_config.update({
-            "trino_workers": trino_workers,
-            "trino_worker_cpu": trino_worker_cpu,
-            "trino_worker_ram_gb": trino_worker_ram_gb,
-        })
+        cluster_config.update(
+            {
+                "trino_workers": trino_workers,
+                "trino_worker_cpu": trino_worker_cpu,
+                "trino_worker_ram_gb": trino_worker_ram_gb,
+            }
+        )
 
     # Sample MinIO topology
-    minio_enabled = trial.suggest_categorical("minio_enabled", cluster_space["minio_enabled"])
+    minio_enabled = trial.suggest_categorical(
+        "minio_enabled", cluster_space["minio_enabled"]
+    )
     cluster_config["minio_enabled"] = minio_enabled
 
     if minio_enabled:
-        minio_topology = trial.suggest_categorical("minio_topology", cluster_space["minio_topology"])
-        minio_nodes = trial.suggest_categorical("minio_nodes", cluster_space["minio_nodes"])
+        minio_topology = trial.suggest_categorical(
+            "minio_topology", cluster_space["minio_topology"]
+        )
+        minio_nodes = trial.suggest_categorical(
+            "minio_nodes", cluster_space["minio_nodes"]
+        )
         minio_cpu = trial.suggest_categorical("minio_cpu", cluster_space["minio_cpu"])
-        minio_ram_gb = trial.suggest_categorical("minio_ram_gb", cluster_space["minio_ram_gb"])
-        minio_disk_size_gb = trial.suggest_categorical("minio_disk_size_gb", cluster_space["minio_disk_size_gb"])
-        cluster_config.update({
-            "minio_topology": minio_topology,
-            "minio_nodes": minio_nodes,
-            "minio_cpu": minio_cpu,
-            "minio_ram_gb": minio_ram_gb,
-            "minio_disk_size_gb": minio_disk_size_gb,
-        })
+        minio_ram_gb = trial.suggest_categorical(
+            "minio_ram_gb", cluster_space["minio_ram_gb"]
+        )
+        minio_disk_size_gb = trial.suggest_categorical(
+            "minio_disk_size_gb", cluster_space["minio_disk_size_gb"]
+        )
+        cluster_config.update(
+            {
+                "minio_topology": minio_topology,
+                "minio_nodes": minio_nodes,
+                "minio_cpu": minio_cpu,
+                "minio_ram_gb": minio_ram_gb,
+                "minio_disk_size_gb": minio_disk_size_gb,
+            }
+        )
 
     infra_config = {
         "cpu": cpu,

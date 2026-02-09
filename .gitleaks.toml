@@ -7,4 +7,5 @@ regexes = [
   '''"your-password"''',
   '''"your-openstack-password"''',
   '''"your-api-token"''',
+  '''"minioadmin"''',  # Default MinIO password (not a secret)
 ]

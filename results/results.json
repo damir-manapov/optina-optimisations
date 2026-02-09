@@ -25,5 +25,46 @@
       "benchmark_s": 87.85501146316528,
       "trial_total_s": 164.9958209991455
     }
+  },
+  {
+    "id": 0,
+    "trial": 0,
+    "timestamp": "2026-02-09T20:35:00.366102",
+    "service": "trino-iceberg",
+    "cloud": "selectel",
+    "login": "damir",
+    "infra_config": {
+      "cpu": 16,
+      "ram_gb": 64,
+      "disk_type": "fast",
+      "disk_size_gb": 400
+    },
+    "metrics": {
+      "lookup_by_id_per_sec": 2.84,
+      "lookup_by_id_p50_ms": 5380.89,
+      "lookup_by_id_p95_ms": 5826.67,
+      "lookup_by_id_p99_ms": 5880.5,
+      "total_lookups": 176,
+      "duration_s": 77.23215317726135
+    },
+    "mode": "cluster",
+    "timings": {
+      "benchmark_s": 97.68892908096313,
+      "trial_total_s": 863.6880128383636,
+      "baseline_s": 51.74759483337402,
+      "terraform_s": 90.42310786247253,
+      "vm_ready_s": 144.96694946289062
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8676.016199,
+        "rand_write_iops": 3737.763112,
+        "rand_read_lat_ms": 0.455795623152,
+        "rand_write_lat_ms": 0.008669592785000001,
+        "seq_read_mib_s": 339.6318359375,
+        "seq_write_mib_s": 277.521484375
+      },
+      "sysbench": {}
+    }
   }
 ]
