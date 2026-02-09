@@ -511,5 +511,94 @@
       "trial_total_s": 77.02015709877014,
       "terraform_s": 7.9400928020477295
     }
+  },
+  {
+    "id": 23,
+    "trial": 23,
+    "timestamp": "2026-02-09T23:43:27.066851",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "config": {
+      "nodes": 4,
+      "cpu_per_node": 8,
+      "ram_per_node": 16,
+      "drives_per_node": 3,
+      "drive_size_gb": 100,
+      "drive_type": "universal"
+    },
+    "metrics": {
+      "total_mib_s": 0.0,
+      "get_mib_s": 0.0,
+      "put_mib_s": 0.0,
+      "duration_s": 0.0
+    },
+    "total_drives": 12,
+    "error": "Benchmark failed",
+    "timings": {
+      "benchmark_s": 5.735474109649658,
+      "trial_total_s": 232.79453921318054,
+      "baseline_s": 62.279693841934204,
+      "terraform_s": 64.20508050918579,
+      "vm_ready_s": 3.5762786865234375e-06
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 7911.622485,
+        "rand_write_iops": 3406.398411,
+        "rand_read_lat_ms": 0.42382822694800004,
+        "rand_write_lat_ms": 0.009135009202,
+        "seq_read_mib_s": 265.2197265625,
+        "seq_write_mib_s": 345.6748046875
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3555.38,
+        "mem_mib_per_sec": 25106.09
+      }
+    }
+  },
+  {
+    "id": 24,
+    "trial": 24,
+    "timestamp": "2026-02-09T23:47:48.420664",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "config": {
+      "nodes": 3,
+      "cpu_per_node": 4,
+      "ram_per_node": 8,
+      "drives_per_node": 3,
+      "drive_size_gb": 100,
+      "drive_type": "universal"
+    },
+    "metrics": {
+      "total_mib_s": 0.0,
+      "get_mib_s": 0.0,
+      "put_mib_s": 0.0,
+      "duration_s": 0.0
+    },
+    "total_drives": 9,
+    "error": "Benchmark failed",
+    "timings": {
+      "benchmark_s": 3.9557299613952637,
+      "trial_total_s": 261.2847855091095,
+      "baseline_s": 80.01313829421997,
+      "terraform_s": 70.83270359039307,
+      "vm_ready_s": 2.86102294921875e-06
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8710.014499,
+        "rand_write_iops": 3751.812409,
+        "rand_read_lat_ms": 0.45384309509299997,
+        "rand_write_lat_ms": 0.009267485954,
+        "seq_read_mib_s": 267.4462890625,
+        "seq_write_mib_s": 342.2431640625
+      },
+      "sysbench": {
+        "mem_mib_per_sec": 25296.52
+      }
+    }
   }
 ]
