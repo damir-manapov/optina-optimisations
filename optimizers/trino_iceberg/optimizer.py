@@ -450,15 +450,19 @@ npx @mkven/samples-generation /tmp/benchmark_scenario.json \
 
         with_clause = f"WITH ({', '.join(with_items)})" if with_items else ""
 
-        # Use full path to trino-cli
-        recreate_cmd = f"""
-java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute "
-CREATE TABLE iceberg.warehouse.benchmark_opt
+        # Use heredoc to avoid shell escaping issues with SQL quotes
+        recreate_sql = f"""CREATE TABLE iceberg.warehouse.benchmark_opt
 {with_clause}
-AS SELECT * FROM iceberg.warehouse.benchmark
-" 2>&1 && \\
-java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute "DROP TABLE iceberg.warehouse.benchmark" 2>&1 && \\
-java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute "ALTER TABLE iceberg.warehouse.benchmark_opt RENAME TO benchmark" 2>&1
+AS SELECT * FROM iceberg.warehouse.benchmark"""
+
+        recreate_cmd = f"""
+cat << 'EOSQL' | java -jar /opt/trino/trino-cli.jar --server localhost:8080
+{recreate_sql}
+EOSQL
+if [ $? -eq 0 ]; then
+    java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute "DROP TABLE iceberg.warehouse.benchmark" 2>&1
+    java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute "ALTER TABLE iceberg.warehouse.benchmark_opt RENAME TO benchmark" 2>&1
+fi
 """
         code, output = run_ssh_command(
             vm_ip, recreate_cmd, timeout=1800, jump_host=jump_host
