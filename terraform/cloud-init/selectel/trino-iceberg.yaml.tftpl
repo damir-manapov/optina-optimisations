@@ -1,9 +1,11 @@
 #cloud-config
-# Trino + Nessie + MinIO + PostgreSQL setup for Iceberg benchmarking
+# Trino Coordinator + Nessie + PostgreSQL setup for Iceberg benchmarking
 # Stack: MinIO (S3) -> Nessie (catalog) -> Trino (query engine)
+# Supports: solo (all-in-one with local MinIO) and cluster (coordinator with external MinIO)
 
 write_files:
-  # MinIO systemd service
+%{ if !minio_internal ~}
+  # MinIO systemd service (only in solo mode with local MinIO)
   - path: /etc/systemd/system/minio.service
     content: |
       [Unit]
@@ -24,15 +26,15 @@ write_files:
       [Install]
       WantedBy=multi-user.target
     permissions: '0644'
+%{ endif ~}
 
   # Nessie systemd service (management port 9090 to avoid conflict with MinIO)
   - path: /etc/systemd/system/nessie.service
     content: |
       [Unit]
       Description=Nessie Catalog Server
-      After=network.target postgresql.service minio.service
+      After=network.target postgresql.service
       Requires=postgresql.service
-      Wants=minio.service
 
       [Service]
       Type=simple
@@ -56,7 +58,7 @@ write_files:
   - path: /etc/trino/node.properties
     content: |
       node.environment=benchmark
-      node.id=trino-1
+      node.id=trino-coordinator
       node.data-dir=/data/trino
     permissions: '0644'
 
@@ -74,16 +76,20 @@ write_files:
       -Djdk.attach.allowAttachSelf=true
     permissions: '0644'
 
-  # Trino config.properties
+  # Trino config.properties (coordinator mode)
   - path: /etc/trino/config.properties
     content: |
       coordinator=true
+%{ if is_cluster ~}
+      node-scheduler.include-coordinator=false
+%{ else ~}
       node-scheduler.include-coordinator=true
+%{ endif ~}
       http-server.http.port=8080
       query.max-memory=${floor(trino_ram_gb * 0.4)}GB
       query.max-memory-per-node=${floor(trino_ram_gb * 0.4)}GB
-      discovery.uri=http://localhost:8080
-      task.concurrency=16
+      discovery.uri=http://${coordinator_ip}:8080
+      task.concurrency=${trino_cpu}
     permissions: '0644'
 
   # Trino log.properties
@@ -92,7 +98,7 @@ write_files:
       io.trino=INFO
     permissions: '0644'
 
-  # Iceberg catalog configuration with MinIO (S3) backend
+  # Iceberg catalog configuration
   - path: /etc/trino/catalog/iceberg.properties
     content: |
       connector.name=iceberg
@@ -100,7 +106,7 @@ write_files:
       iceberg.nessie-catalog.uri=http://localhost:19120/api/v2
       iceberg.nessie-catalog.default-warehouse-dir=s3://warehouse/
       fs.native-s3.enabled=true
-      s3.endpoint=http://localhost:9000
+      s3.endpoint=${minio_endpoint}
       s3.region=us-east-1
       s3.path-style-access=true
       s3.aws-access-key=minioadmin
@@ -111,9 +117,9 @@ write_files:
   - path: /etc/systemd/system/trino.service
     content: |
       [Unit]
-      Description=Trino Server
-      After=network.target nessie.service minio.service
-      Wants=nessie.service minio.service
+      Description=Trino Coordinator
+      After=network.target nessie.service
+      Wants=nessie.service
 
       [Service]
       Type=forking
@@ -221,17 +227,24 @@ runcmd:
     fi
 
   # Create directories
-  - mkdir -p /data/trino /data/minio /data/nessie /opt/trino /opt/nessie
+  - mkdir -p /data/trino /data/nessie /opt/trino /opt/nessie /etc/trino/catalog
+%{ if !minio_internal ~}
+  - mkdir -p /data/minio
+%{ endif ~}
 
   # Create users
   - useradd -r -s /bin/false -d /opt/trino trino
   - useradd -r -s /bin/false -d /opt/nessie nessie
+%{ if !minio_internal ~}
   - useradd -r -s /bin/false -d /data/minio minio
+%{ endif ~}
 
   # Set ownership
   - chown -R trino:trino /data/trino /opt/trino /etc/trino
   - chown -R nessie:nessie /data/nessie /opt/nessie
+%{ if !minio_internal ~}
   - chown -R minio:minio /data/minio
+%{ endif ~}
 
   # Setup PostgreSQL for Nessie
   - systemctl start postgresql
@@ -239,7 +252,8 @@ runcmd:
   - sudo -u postgres psql -c "CREATE DATABASE nessie OWNER nessie;" || true
   - systemctl restart postgresql
 
-  # Download and install MinIO
+%{ if !minio_internal ~}
+  # Download and install MinIO (solo mode only)
   - |
     echo "Downloading MinIO..."
     wget -q https://dl.min.io/server/minio/release/linux-amd64/minio -O /usr/local/bin/minio
@@ -247,6 +261,12 @@ runcmd:
     wget -q https://dl.min.io/client/mc/release/linux-amd64/mc -O /usr/local/bin/mc
     chmod +x /usr/local/bin/mc
     echo "MinIO installation complete"
+%{ else ~}
+  # Install mc CLI for external MinIO
+  - |
+    wget -q https://dl.min.io/client/mc/release/linux-amd64/mc -O /usr/local/bin/mc
+    chmod +x /usr/local/bin/mc
+%{ endif ~}
 
   # Download and install Nessie
   - |
@@ -268,12 +288,17 @@ runcmd:
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
     apt-get install -y nodejs
 
-  # Start services in order: MinIO -> Nessie -> Trino
+  # Start services
   - systemctl daemon-reload
+%{ if !minio_internal ~}
   - systemctl enable minio nessie trino
   - systemctl start minio
+%{ else ~}
+  - systemctl enable nessie trino
+%{ endif ~}
 
-  # Wait for MinIO and create bucket
+%{ if !minio_internal ~}
+  # Wait for local MinIO and create bucket
   - |
     for i in $(seq 1 30); do
       if curl -sf http://localhost:9000/minio/health/live > /dev/null 2>&1; then
@@ -286,6 +311,21 @@ runcmd:
     /usr/local/bin/mc alias set local http://localhost:9000 minioadmin minioadmin
     /usr/local/bin/mc mb local/warehouse --ignore-existing
     echo "MinIO bucket 'warehouse' created"
+%{ else ~}
+  # Wait for external MinIO and create bucket
+  - |
+    for i in $(seq 1 60); do
+      if curl -sf ${minio_endpoint}/minio/health/live > /dev/null 2>&1; then
+        echo "External MinIO is ready"
+        break
+      fi
+      echo "Waiting for external MinIO... ($i/60)"
+      sleep 3
+    done
+    /usr/local/bin/mc alias set minio ${minio_endpoint} minioadmin minioadmin
+    /usr/local/bin/mc mb minio/warehouse --ignore-existing
+    echo "MinIO bucket 'warehouse' created"
+%{ endif ~}
 
   # Start Nessie
   - systemctl start nessie
@@ -314,6 +354,21 @@ runcmd:
       echo "Waiting for Trino... ($i/60)"
       sleep 5
     done
+
+%{ if is_cluster ~}
+  # Wait for workers to join (cluster mode)
+  - |
+    echo "Waiting for ${length(worker_ips)} workers to join..."
+    for i in $(seq 1 120); do
+      WORKERS=$(java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute "SELECT count(*) FROM system.runtime.nodes WHERE coordinator = false" 2>/dev/null | tail -1 | tr -d '"' || echo "0")
+      if [ "$WORKERS" -ge "${length(worker_ips)}" ]; then
+        echo "All workers joined"
+        break
+      fi
+      echo "Workers: $WORKERS/${length(worker_ips)} ($i/120)"
+      sleep 5
+    done
+%{ endif ~}
 
   # Create Iceberg schema
   - |

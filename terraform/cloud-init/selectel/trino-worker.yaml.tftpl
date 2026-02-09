@@ -1,0 +1,169 @@
+#cloud-config
+# Trino Worker Node setup
+# Connects to coordinator at ${coordinator_ip}
+
+write_files:
+  # Trino node.properties (worker mode)
+  - path: /etc/trino/node.properties
+    content: |
+      node.environment=benchmark
+      node.id=trino-worker-$${HOSTNAME##*-}
+      node.data-dir=/data/trino
+    permissions: '0644'
+
+  # Trino JVM config
+  - path: /etc/trino/jvm.config
+    content: |
+      -server
+      -Xmx${floor(trino_ram_gb * 0.7 * 1024)}m
+      -Xms${floor(trino_ram_gb * 0.7 * 1024)}m
+      -XX:+UseG1GC
+      -XX:G1HeapRegionSize=32M
+      -XX:+ExplicitGCInvokesConcurrent
+      -XX:+HeapDumpOnOutOfMemoryError
+      -XX:ReservedCodeCacheSize=512M
+      -Djdk.attach.allowAttachSelf=true
+    permissions: '0644'
+
+  # Trino config.properties (worker mode - connects to coordinator)
+  - path: /etc/trino/config.properties
+    content: |
+      coordinator=false
+      http-server.http.port=8080
+      query.max-memory=${floor(trino_ram_gb * 0.4)}GB
+      query.max-memory-per-node=${floor(trino_ram_gb * 0.4)}GB
+      discovery.uri=http://${coordinator_ip}:8080
+      task.concurrency=${trino_cpu}
+    permissions: '0644'
+
+  # Trino log.properties
+  - path: /etc/trino/log.properties
+    content: |
+      io.trino=INFO
+    permissions: '0644'
+
+  # Iceberg catalog configuration
+  - path: /etc/trino/catalog/iceberg.properties
+    content: |
+      connector.name=iceberg
+      iceberg.catalog.type=nessie
+      iceberg.nessie-catalog.uri=http://${coordinator_ip}:19120/api/v2
+      iceberg.nessie-catalog.default-warehouse-dir=s3://warehouse/
+      fs.native-s3.enabled=true
+      s3.endpoint=${minio_endpoint}
+      s3.region=us-east-1
+      s3.path-style-access=true
+      s3.aws-access-key=minioadmin
+      s3.aws-secret-key=minioadmin
+    permissions: '0644'
+
+  # Trino systemd service
+  - path: /etc/systemd/system/trino.service
+    content: |
+      [Unit]
+      Description=Trino Worker
+      After=network.target
+
+      [Service]
+      Type=forking
+      User=trino
+      Group=trino
+      Environment="JAVA_HOME=/usr/lib/jvm/temurin-23-jdk-amd64"
+      ExecStart=/opt/trino/bin/launcher start
+      ExecStop=/opt/trino/bin/launcher stop
+      Restart=on-failure
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+    permissions: '0644'
+
+  # Trino installation script
+  - path: /opt/install-trino.sh
+    content: |
+      #!/bin/bash
+      set -e
+      cd /opt
+      TRINO_VERSION=467
+      TRINO_URL="https://repo1.maven.org/maven2/io/trino/trino-server/$TRINO_VERSION/trino-server-$TRINO_VERSION.tar.gz"
+
+      echo "Downloading Trino server..."
+      for i in 1 2 3; do
+        if wget --progress=dot:giga -t 3 -c "$TRINO_URL" -O trino-server.tar.gz; then
+          break
+        fi
+        echo "Retry $i/3..."
+        sleep 10
+      done
+
+      echo "Extracting Trino..."
+      tar -xzf trino-server.tar.gz
+      mv trino-server-$TRINO_VERSION/* trino/
+      rm -rf trino-server-$TRINO_VERSION trino-server.tar.gz
+
+      rm -rf /opt/trino/etc
+      ln -s /etc/trino /opt/trino/etc
+
+      chown -R trino:trino /opt/trino
+      echo "Trino installation complete"
+    permissions: '0755'
+
+runcmd:
+  # Wait for DNS
+  - |
+    for i in $(seq 1 30); do
+      if host mirror.selectel.ru > /dev/null 2>&1; then break; fi
+      sleep 5
+    done
+
+  # Install packages
+  - apt-get update
+  - apt-get install -y curl wget jq dnsutils
+
+  # Install Java 23
+  - |
+    curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public > /tmp/adoptium.key
+    gpg --batch --dearmor < /tmp/adoptium.key > /usr/share/keyrings/adoptium.gpg
+    echo "deb [signed-by=/usr/share/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb $(lsb_release -cs) main" > /etc/apt/sources.list.d/adoptium.list
+    apt-get update
+    apt-get install -y temurin-23-jdk
+    echo "JAVA_HOME=/usr/lib/jvm/temurin-23-jdk-amd64" >> /etc/environment
+
+  # Format and mount data volume
+  - |
+    if [ -b /dev/vdb ]; then
+      mkfs.ext4 -F /dev/vdb
+      mkdir -p /data
+      mount /dev/vdb /data
+      echo '/dev/vdb /data ext4 defaults,nofail 0 2' >> /etc/fstab
+    else
+      mkdir -p /data
+    fi
+
+  # Create directories and user
+  - mkdir -p /data/trino /opt/trino /etc/trino/catalog
+  - useradd -r -s /bin/false -d /opt/trino trino
+  - chown -R trino:trino /data/trino /opt/trino /etc/trino
+
+  # Install Trino
+  - /opt/install-trino.sh
+
+  # Wait for coordinator to be ready
+  - |
+    echo "Waiting for coordinator at ${coordinator_ip}:8080..."
+    for i in $(seq 1 120); do
+      if curl -sf http://${coordinator_ip}:8080/v1/info > /dev/null 2>&1; then
+        echo "Coordinator ready"
+        break
+      fi
+      echo "Waiting... ($i/120)"
+      sleep 5
+    done
+
+  # Start Trino worker
+  - systemctl daemon-reload
+  - systemctl enable trino
+  - systemctl start trino
+
+  # Signal ready
+  - touch /root/cloud-init-ready
