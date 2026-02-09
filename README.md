@@ -58,9 +58,23 @@ uv run python optimizers/redis/optimizer.py --cloud selectel --show-results
 
 1. **Optuna suggests** configuration (CPU, RAM, disk, software settings)
 2. **Terraform deploys** infrastructure
-3. **Benchmark runs** against deployed system
-4. **Results logged** and Optuna learns
-5. **Repeat** until convergence
+3. **System baseline** runs fio + sysbench to measure VM hardware performance
+4. **Benchmark runs** against deployed system
+5. **Results logged** and Optuna learns
+6. **Repeat** until convergence
+
+### System Baseline
+
+Each trial runs fio and sysbench on the service VM to capture hardware performance:
+
+| Test | Metrics |
+|------|---------|
+| fio random 4K | Read/Write IOPS, latency |
+| fio sequential 1M | Read/Write throughput (MiB/s) |
+| sysbench CPU | Events per second |
+| sysbench memory | Memory bandwidth (MiB/s) |
+
+This helps identify when poor benchmark results are due to VM hardware variance vs. configuration issues.
 
 ## Project Structure
 

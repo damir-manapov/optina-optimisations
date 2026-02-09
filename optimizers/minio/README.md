@@ -48,3 +48,12 @@ MinIO requires at least 4 drives for erasure coding:
 ## Benchmark
 
 warp benchmark tool measuring PUT/GET throughput with mixed workload.
+
+## System Baseline
+
+Before each benchmark, fio and sysbench run on the first MinIO node to measure:
+- Disk: Random 4K IOPS, sequential throughput on /data1
+- CPU: Events per second
+- Memory: Bandwidth (MiB/s)
+
+Baseline results are saved with each trial to help identify hardware variance.

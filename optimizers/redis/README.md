@@ -55,3 +55,12 @@ memtier_benchmark with:
 - 16 threads, 50 connections per thread
 - 10,000 requests per connection
 - Random keys, 256-byte values
+
+## System Baseline
+
+Before each benchmark, fio and sysbench run on the Redis node (10.0.0.20) to measure:
+- Disk: Random 4K IOPS, sequential throughput
+- CPU: Events per second
+- Memory: Bandwidth (MiB/s)
+
+Baseline results are saved with each trial to help identify hardware variance.

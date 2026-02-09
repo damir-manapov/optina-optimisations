@@ -62,3 +62,12 @@ k6 load test with realistic query mix:
 - 20% typo-tolerant
 - 20% filtered search
 - 10% phrase + sort
+
+## System Baseline
+
+During infrastructure optimization (--mode infra), fio and sysbench run on the Meilisearch node to measure:
+- Disk: Random 4K IOPS, sequential throughput
+- CPU: Events per second
+- Memory: Bandwidth (MiB/s)
+
+Baseline results are saved with each trial to help identify hardware variance.

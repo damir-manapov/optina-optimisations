@@ -73,3 +73,12 @@ pgbench with TPC-B-like workload:
 - Scale factor = 10 × RAM in GB
 - 60-second benchmark runs
 - Clients = 4 × CPU cores
+
+## System Baseline
+
+During infrastructure optimization (--mode infra), fio and sysbench run on the Postgres node to measure:
+- Disk: Random 4K IOPS, sequential throughput
+- CPU: Events per second
+- Memory: Bandwidth (MiB/s)
+
+Baseline results are saved with each trial to help identify hardware variance.
