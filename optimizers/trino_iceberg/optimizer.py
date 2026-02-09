@@ -445,7 +445,8 @@ npx @mkven/samples-generation /tmp/benchmark_scenario.json \
         if partition_spec:
             with_items.append(partition_spec)
         if table_props:
-            with_items.extend(f"'{k}' = '{v}'" for k, v in table_props.items())
+            # Iceberg properties: key = 'value' (unquoted key, quoted value)
+            with_items.extend(f"{k} = '{v}'" for k, v in table_props.items())
 
         with_clause = f"WITH ({', '.join(with_items)})" if with_items else ""
 
