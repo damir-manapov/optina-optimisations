@@ -1496,17 +1496,17 @@ Examples:
                 n_trials=args.trials,
             )
         elif args.mode == "full":
-            # Phase 1: Infrastructure optimization
-            print("\n=== Phase 1: Infrastructure Optimization ===\n")
-            study_infra = optuna.create_study(
-                study_name=f"{study_name}-infra",
+            # Phase 1: Cluster topology optimization (includes infra)
+            print("\n=== Phase 1: Cluster Topology Optimization ===\n")
+            study_cluster = optuna.create_study(
+                study_name=f"{study_name}-cluster",
                 storage=storage,
                 direction=direction,
                 sampler=TPESampler(),
                 load_if_exists=True,
             )
-            study_infra.optimize(
-                lambda t: objective_infra(
+            study_cluster.optimize(
+                lambda t: objective_cluster(
                     t,
                     cloud_config,
                     args.metric,
@@ -1517,15 +1517,15 @@ Examples:
                 n_trials=args.trials // 2,
             )
 
-            # Get best infra from results
+            # Get best infra from results (cluster mode includes infra)
             store = get_store()
             results = [
                 r
                 for r in store.as_dicts()
-                if r.get("cloud") == args.cloud and r.get("mode") == "infra"
+                if r.get("cloud") == args.cloud and r.get("mode") == "cluster"
             ]
             if not results:
-                print("No infra results found, cannot proceed to config optimization")
+                print("No cluster results found, cannot proceed to config optimization")
                 return
 
             best_result = max(
