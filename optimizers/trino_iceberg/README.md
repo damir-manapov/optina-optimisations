@@ -93,6 +93,7 @@ Point lookup by ID benchmark using concurrent queries:
 - Random IDs from dataset
 - Concurrency: 16 (fixed for fair comparison)
 - Duration: 60 seconds
+- Runs from benchmark VM (over network) to Trino VM
 
 ## Data Generation
 

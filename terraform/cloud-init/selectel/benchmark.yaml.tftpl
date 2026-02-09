@@ -48,6 +48,10 @@ runcmd:
   - echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | tee /etc/apt/sources.list.d/k6.list
   - apt-get update && apt-get install -y k6
 
+  # Install Trino CLI (for Trino-Iceberg benchmarks)
+  - curl -L https://repo1.maven.org/maven2/io/trino/trino-cli/467/trino-cli-467-executable.jar -o /usr/local/bin/trino
+  - chmod +x /usr/local/bin/trino
+
   # Clone and setup project
   - cd /root
   - git clone https://github.com/damir-manapov/indexless-query-benchmarks.git

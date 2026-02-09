@@ -406,25 +406,26 @@ trino --execute "ALTER TABLE iceberg.warehouse.benchmark_opt RENAME TO benchmark
 
 
 def run_lookup_by_id_benchmark(
-    vm_ip: str,
+    benchmark_ip: str,
+    trino_ip: str,
     duration: int = 60,
     concurrency: int = 8,
-    jump_host: str | None = None,
 ) -> BenchmarkResult:
-    """Run point lookup by ID benchmark against Trino.
+    """Run point lookup by ID benchmark against Trino from benchmark VM.
 
     Executes random ID lookups: SELECT * FROM benchmark WHERE id = ?
+    Benchmark runs on benchmark_ip, connecting to Trino at trino_ip:8080.
     """
-    print(f"  Running lookup benchmark ({duration}s, {concurrency} concurrent)...")
+    print(f"  Running lookup benchmark ({duration}s, {concurrency} concurrent) from benchmark VM...")
 
-    # Get max ID for random lookups
-    max_id_cmd = "trino --execute 'SELECT max(id) FROM iceberg.warehouse.benchmark' 2>/dev/null | tail -1"
-    code, output = run_ssh_command(vm_ip, max_id_cmd, timeout=60, jump_host=jump_host)
+    # Get max ID for random lookups (query from benchmark VM)
+    max_id_cmd = f"trino --server http://{trino_ip}:8080 --execute 'SELECT max(id) FROM iceberg.warehouse.benchmark' 2>/dev/null | tail -1"
+    code, output = run_ssh_command(benchmark_ip, max_id_cmd, timeout=60)
     if code != 0 or not output.strip().isdigit():
         return BenchmarkResult(error=f"Failed to get max ID: {output}")
     max_id = int(output.strip())
 
-    # Create benchmark script
+    # Create benchmark script that connects to Trino over network
     bench_script = f"""
 import time
 import random
@@ -432,6 +433,7 @@ import subprocess
 import statistics
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+TRINO_SERVER = "http://{trino_ip}:8080"
 MAX_ID = {max_id}
 DURATION = {duration}
 CONCURRENCY = {concurrency}
@@ -444,7 +446,7 @@ def run_lookup():
     id_val = random.randint(1, MAX_ID)
     start = time.time()
     result = subprocess.run(
-        ['trino', '--execute', f'SELECT * FROM iceberg.warehouse.benchmark WHERE id = {{id_val}}'],
+        ['trino', '--server', TRINO_SERVER, '--execute', f'SELECT * FROM iceberg.warehouse.benchmark WHERE id = {{id_val}}'],
         capture_output=True, text=True, timeout=30
     )
     elapsed_ms = (time.time() - start) * 1000
@@ -476,15 +478,15 @@ print(f"total_lookups={{completed}}")
 print(f"errors={{errors}}")
 """
 
-    # Write and run benchmark script
+    # Write and run benchmark script on benchmark VM
     write_cmd = f"cat > /tmp/lookup_bench.py << 'EOFBENCH'\n{bench_script}\nEOFBENCH"
-    code, _ = run_ssh_command(vm_ip, write_cmd, timeout=30, jump_host=jump_host)
+    code, _ = run_ssh_command(benchmark_ip, write_cmd, timeout=30)
     if code != 0:
         return BenchmarkResult(error="Failed to write benchmark script")
 
     start = time.time()
     bench_cmd = "python3 /tmp/lookup_bench.py 2>&1"
-    code, output = run_ssh_command(vm_ip, bench_cmd, timeout=duration + 120, jump_host=jump_host)
+    code, output = run_ssh_command(benchmark_ip, bench_cmd, timeout=duration + 120)
     elapsed = time.time() - start
 
     if code != 0:
@@ -723,7 +725,7 @@ def objective_infra(
 
         # Run benchmark
         bench_start = time.time()
-        result = run_lookup_by_id_benchmark(trino_ip, duration=60, concurrency=16, jump_host=benchmark_ip)
+        result = run_lookup_by_id_benchmark(benchmark_ip, trino_ip, duration=60, concurrency=16)
         timings.benchmark_s = time.time() - bench_start
 
         result.baseline = baseline
@@ -812,7 +814,7 @@ def objective_config(
 
         # Run benchmark
         bench_start = time.time()
-        result = run_lookup_by_id_benchmark(trino_ip, duration=60, concurrency=16, jump_host=benchmark_ip)
+        result = run_lookup_by_id_benchmark(benchmark_ip, trino_ip, duration=60, concurrency=16)
         timings.benchmark_s = time.time() - bench_start
 
         result.timings = timings

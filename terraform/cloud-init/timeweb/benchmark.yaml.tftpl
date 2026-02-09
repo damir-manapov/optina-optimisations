@@ -46,6 +46,10 @@ runcmd:
   # PNPM via npm (more reliable than install script)
   - npm install -g pnpm
 
+  # Install Trino CLI (for Trino-Iceberg benchmarks)
+  - curl -L https://repo1.maven.org/maven2/io/trino/trino-cli/467/trino-cli-467-executable.jar -o /usr/local/bin/trino
+  - chmod +x /usr/local/bin/trino
+
   # Clone and setup project
   - cd /root
   - git clone https://github.com/damir-manapov/indexless-query-benchmarks.git
