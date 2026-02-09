@@ -156,8 +156,20 @@ locals {
   # Chown directories
   chown_dirs = join(" ", [for i in range(1, var.minio_drives_per_node + 1) : "/data${i}"])
 
-  # MinIO volume spec: http://minio{1...N}:9000/data{1...M}
-  minio_volume_spec = "http://minio{1...${var.minio_node_count}}:9000/data{1...${var.minio_drives_per_node}}"
+  # Total drives across cluster
+  total_drives = var.minio_node_count * var.minio_drives_per_node
+
+  # MinIO volume spec:
+  # - Single node with single drive: /data1 (no erasure coding, simple mode)
+  # - Single node with multiple drives: /data{1...N} (single-node erasure)
+  # - Multiple nodes: http://minio{1...N}:9000/data{1...M} (distributed erasure)
+  minio_volume_spec = (
+    var.minio_node_count == 1 && var.minio_drives_per_node == 1
+    ? "/data1"
+    : var.minio_node_count == 1
+      ? "/data{1...${var.minio_drives_per_node}}"
+      : "http://minio{1...${var.minio_node_count}}:9000/data{1...${var.minio_drives_per_node}}"
+  )
 
   minio_cloud_init = templatefile("${path.module}/minio-cloud-init.yaml", {
     node_count      = var.minio_node_count

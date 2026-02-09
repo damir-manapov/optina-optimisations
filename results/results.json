@@ -1,688 +1,6 @@
 [
   {
     "id": null,
-    "trial": 0,
-    "timestamp": "2025-12-28T15:58:33.679260",
-    "service": "minio",
-    "cloud": "selectel",
-    "login": null,
-    "infra": null,
-    "infra_config": null,
-    "config": {
-      "nodes": 2,
-      "cpu_per_node": 2,
-      "ram_per_node": 4,
-      "drives_per_node": 1,
-      "drive_size_gb": 200,
-      "drive_type": "fast"
-    },
-    "pg_config": null,
-    "metrics": null,
-    "nodes": null,
-    "total_drives": 2,
-    "mode": null,
-    "error": null,
-    "timings": {
-      "benchmark_s": 169.0670874118805,
-      "trial_total_s": 464.65902519226074,
-      "redis_deploy_s": 0.0,
-      "minio_deploy_s": 140.72033190727234,
-      "minio_destroy_s": 36.85264468193054,
-      "baseline_s": 49.070234060287476,
-      "pg_ready_s": 0.0,
-      "pgbench_init_s": 0.0,
-      "meili_ready_s": 0.0,
-      "dataset_gen_s": 0.0,
-      "indexing_s": 0.0,
-      "terraform_s": 0.0,
-      "vm_ready_s": 0.0
-    },
-    "system_baseline": {
-      "fio": {
-        "rand_read_iops": 6867.463254,
-        "rand_write_iops": 2965.90341,
-        "rand_read_lat_ms": 0.574854969592,
-        "rand_write_lat_ms": 0.011394617828000001,
-        "seq_read_mib_s": 342.8310546875,
-        "seq_write_mib_s": 249.2939453125
-      },
-      "sysbench": {
-        "cpu_events_per_sec": 3453.38,
-        "mem_mib_per_sec": 21781.75
-      }
-    }
-  },
-  {
-    "id": null,
-    "trial": 1,
-    "timestamp": "2025-12-28T16:05:35.177155",
-    "service": "minio",
-    "cloud": "selectel",
-    "login": null,
-    "infra": null,
-    "infra_config": null,
-    "config": {
-      "nodes": 1,
-      "cpu_per_node": 4,
-      "ram_per_node": 32,
-      "drives_per_node": 4,
-      "drive_size_gb": 100,
-      "drive_type": "universal"
-    },
-    "pg_config": null,
-    "metrics": null,
-    "nodes": null,
-    "total_drives": 4,
-    "mode": null,
-    "error": null,
-    "timings": {
-      "benchmark_s": 115.01261687278748,
-      "trial_total_s": 421.44186186790466,
-      "redis_deploy_s": 0.0,
-      "minio_deploy_s": 152.72295689582825,
-      "minio_destroy_s": 53.495217084884644,
-      "baseline_s": 56.961562395095825,
-      "pg_ready_s": 0.0,
-      "pgbench_init_s": 0.0,
-      "meili_ready_s": 0.0,
-      "dataset_gen_s": 0.0,
-      "indexing_s": 0.0,
-      "terraform_s": 0.0,
-      "vm_ready_s": 0.0
-    },
-    "system_baseline": {
-      "fio": {
-        "rand_read_iops": 7034.548273,
-        "rand_write_iops": 3037.9981,
-        "rand_read_lat_ms": 0.563339479914,
-        "rand_write_lat_ms": 0.008687656304,
-        "seq_read_mib_s": 94.880859375,
-        "seq_write_mib_s": 416.951171875
-      },
-      "sysbench": {
-        "cpu_events_per_sec": 3578.96,
-        "mem_mib_per_sec": 25297.52
-      }
-    }
-  },
-  {
-    "id": null,
-    "trial": 2,
-    "timestamp": "2025-12-28T16:15:01.477206",
-    "service": "minio",
-    "cloud": "selectel",
-    "login": null,
-    "infra": null,
-    "infra_config": null,
-    "config": {
-      "nodes": 4,
-      "cpu_per_node": 4,
-      "ram_per_node": 32,
-      "drives_per_node": 2,
-      "drive_size_gb": 100,
-      "drive_type": "basic"
-    },
-    "pg_config": null,
-    "metrics": null,
-    "nodes": null,
-    "total_drives": 8,
-    "mode": null,
-    "error": null,
-    "timings": {
-      "benchmark_s": 235.69440746307373,
-      "trial_total_s": 566.2445001602173,
-      "redis_deploy_s": 0.0,
-      "minio_deploy_s": 152.35136485099792,
-      "minio_destroy_s": 72.76444387435913,
-      "baseline_s": 59.837361335754395,
-      "pg_ready_s": 0.0,
-      "pgbench_init_s": 0.0,
-      "meili_ready_s": 0.0,
-      "dataset_gen_s": 0.0,
-      "indexing_s": 0.0,
-      "terraform_s": 0.0,
-      "vm_ready_s": 0.0
-    },
-    "system_baseline": {
-      "fio": {
-        "rand_read_iops": 384.91528,
-        "rand_write_iops": 171.040136,
-        "rand_read_lat_ms": 10.383571541228,
-        "rand_write_lat_ms": 0.010558145821,
-        "seq_read_mib_s": 52.71484375,
-        "seq_write_mib_s": 131.09765625
-      },
-      "sysbench": {
-        "cpu_events_per_sec": 3446.9,
-        "mem_mib_per_sec": 24648.11
-      }
-    }
-  },
-  {
-    "id": null,
-    "trial": 3,
-    "timestamp": "2025-12-28T16:22:03.780433",
-    "service": "minio",
-    "cloud": "selectel",
-    "login": null,
-    "infra": null,
-    "infra_config": null,
-    "config": {
-      "nodes": 3,
-      "cpu_per_node": 4,
-      "ram_per_node": 16,
-      "drives_per_node": 3,
-      "drive_size_gb": 200,
-      "drive_type": "universal"
-    },
-    "pg_config": null,
-    "metrics": null,
-    "nodes": null,
-    "total_drives": 9,
-    "mode": null,
-    "error": null,
-    "timings": {
-      "benchmark_s": 128.84004497528076,
-      "trial_total_s": 422.257244348526,
-      "redis_deploy_s": 0.0,
-      "minio_deploy_s": 126.76432919502258,
-      "minio_destroy_s": 59.37546396255493,
-      "baseline_s": 56.75616765022278,
-      "pg_ready_s": 0.0,
-      "pgbench_init_s": 0.0,
-      "meili_ready_s": 0.0,
-      "dataset_gen_s": 0.0,
-      "indexing_s": 0.0,
-      "terraform_s": 0.0,
-      "vm_ready_s": 0.0
-    },
-    "system_baseline": {
-      "fio": {
-        "rand_read_iops": 6357.832108,
-        "rand_write_iops": 2743.512824,
-        "rand_read_lat_ms": 0.622019402507,
-        "rand_write_lat_ms": 0.010053066188999999,
-        "seq_read_mib_s": 95.076171875,
-        "seq_write_mib_s": 415.1259765625
-      },
-      "sysbench": {
-        "cpu_events_per_sec": 3454.73,
-        "mem_mib_per_sec": 24247.15
-      }
-    }
-  },
-  {
-    "id": null,
-    "trial": 4,
-    "timestamp": "2025-12-28T16:28:41.568747",
-    "service": "minio",
-    "cloud": "selectel",
-    "login": null,
-    "infra": null,
-    "infra_config": null,
-    "config": {
-      "nodes": 1,
-      "cpu_per_node": 8,
-      "ram_per_node": 8,
-      "drives_per_node": 4,
-      "drive_size_gb": 200,
-      "drive_type": "fast"
-    },
-    "pg_config": null,
-    "metrics": null,
-    "nodes": null,
-    "total_drives": 4,
-    "mode": null,
-    "error": null,
-    "timings": {
-      "benchmark_s": 115.94567728042603,
-      "trial_total_s": 397.74508142471313,
-      "redis_deploy_s": 0.0,
-      "minio_deploy_s": 129.346910238266,
-      "minio_destroy_s": 54.2421190738678,
-      "baseline_s": 49.27939748764038,
-      "pg_ready_s": 0.0,
-      "pgbench_init_s": 0.0,
-      "meili_ready_s": 0.0,
-      "dataset_gen_s": 0.0,
-      "indexing_s": 0.0,
-      "terraform_s": 0.0,
-      "vm_ready_s": 0.0
-    },
-    "system_baseline": {
-      "fio": {
-        "rand_read_iops": 8939.40303,
-        "rand_write_iops": 3846.957652,
-        "rand_read_lat_ms": 0.442748535166,
-        "rand_write_lat_ms": 0.00802579143,
-        "seq_read_mib_s": 337.4306640625,
-        "seq_write_mib_s": 281.28125
-      },
-      "sysbench": {
-        "cpu_events_per_sec": 3444.59,
-        "mem_mib_per_sec": 24731.03
-      }
-    }
-  },
-  {
-    "id": null,
-    "trial": 5,
-    "timestamp": "2025-12-28T16:36:15.488372",
-    "service": "minio",
-    "cloud": "selectel",
-    "login": null,
-    "infra": null,
-    "infra_config": null,
-    "config": {
-      "nodes": 2,
-      "cpu_per_node": 2,
-      "ram_per_node": 4,
-      "drives_per_node": 2,
-      "drive_size_gb": 100,
-      "drive_type": "universal"
-    },
-    "pg_config": null,
-    "metrics": null,
-    "nodes": null,
-    "total_drives": 4,
-    "mode": null,
-    "error": "Benchmark failed",
-    "timings": {
-      "benchmark_s": 4.475951671600342,
-      "trial_total_s": 453.87670493125916,
-      "redis_deploy_s": 0.0,
-      "minio_deploy_s": 393.0366187095642,
-      "minio_destroy_s": 0.0,
-      "baseline_s": 12.96782898902893,
-      "pg_ready_s": 0.0,
-      "pgbench_init_s": 0.0,
-      "meili_ready_s": 0.0,
-      "dataset_gen_s": 0.0,
-      "indexing_s": 0.0,
-      "terraform_s": 0.0,
-      "vm_ready_s": 0.0
-    },
-    "system_baseline": {
-      "fio": null,
-      "sysbench": {
-        "cpu_events_per_sec": 0.0,
-        "mem_mib_per_sec": 0.0
-      }
-    }
-  },
-  {
-    "id": null,
-    "trial": 11,
-    "timestamp": "2025-12-28T16:48:52.827931",
-    "service": "minio",
-    "cloud": "selectel",
-    "login": null,
-    "infra": null,
-    "infra_config": null,
-    "config": {
-      "nodes": 1,
-      "cpu_per_node": 8,
-      "ram_per_node": 8,
-      "drives_per_node": 4,
-      "drive_size_gb": 100,
-      "drive_type": "universal"
-    },
-    "pg_config": null,
-    "metrics": null,
-    "nodes": null,
-    "total_drives": 4,
-    "mode": null,
-    "error": null,
-    "timings": {
-      "benchmark_s": 114.94692492485046,
-      "trial_total_s": 461.1162791252136,
-      "redis_deploy_s": 0.0,
-      "minio_deploy_s": 147.0935719013214,
-      "minio_destroy_s": 42.131760120391846,
-      "baseline_s": 55.1821825504303,
-      "pg_ready_s": 0.0,
-      "pgbench_init_s": 0.0,
-      "meili_ready_s": 0.0,
-      "dataset_gen_s": 0.0,
-      "indexing_s": 0.0,
-      "terraform_s": 0.0,
-      "vm_ready_s": 0.0
-    },
-    "system_baseline": {
-      "fio": {
-        "rand_read_iops": 7023.298835,
-        "rand_write_iops": 3033.348333,
-        "rand_read_lat_ms": 0.564707668271,
-        "rand_write_lat_ms": 0.008202304055,
-        "seq_read_mib_s": 119.8515625,
-        "seq_write_mib_s": 93.029296875
-      },
-      "sysbench": {
-        "cpu_events_per_sec": 3580.94,
-        "mem_mib_per_sec": 25225.26
-      }
-    }
-  },
-  {
-    "id": null,
-    "trial": 16,
-    "timestamp": "2025-12-28T16:57:50.075814",
-    "service": "minio",
-    "cloud": "selectel",
-    "login": null,
-    "infra": null,
-    "infra_config": null,
-    "config": {
-      "nodes": 1,
-      "cpu_per_node": 8,
-      "ram_per_node": 32,
-      "drives_per_node": 4,
-      "drive_size_gb": 100,
-      "drive_type": "basic"
-    },
-    "pg_config": null,
-    "metrics": null,
-    "nodes": null,
-    "total_drives": 4,
-    "mode": null,
-    "error": null,
-    "timings": {
-      "benchmark_s": 243.071222782135,
-      "trial_total_s": 537.0214676856995,
-      "redis_deploy_s": 0.0,
-      "minio_deploy_s": 146.04055404663086,
-      "minio_destroy_s": 51.6465322971344,
-      "baseline_s": 59.36988973617554,
-      "pg_ready_s": 0.0,
-      "pgbench_init_s": 0.0,
-      "meili_ready_s": 0.0,
-      "dataset_gen_s": 0.0,
-      "indexing_s": 0.0,
-      "terraform_s": 0.0,
-      "vm_ready_s": 0.0
-    },
-    "system_baseline": {
-      "fio": {
-        "rand_read_iops": 384.822901,
-        "rand_write_iops": 171.604136,
-        "rand_read_lat_ms": 10.383848375957,
-        "rand_write_lat_ms": 0.010822231732,
-        "seq_read_mib_s": 47.6708984375,
-        "seq_write_mib_s": 140.0322265625
-      },
-      "sysbench": {
-        "cpu_events_per_sec": 3600.75,
-        "mem_mib_per_sec": 24931.17
-      }
-    }
-  },
-  {
-    "id": null,
-    "trial": 18,
-    "timestamp": "2025-12-28T17:05:18.012555",
-    "service": "minio",
-    "cloud": "selectel",
-    "login": null,
-    "infra": null,
-    "infra_config": null,
-    "config": {
-      "nodes": 3,
-      "cpu_per_node": 4,
-      "ram_per_node": 16,
-      "drives_per_node": 3,
-      "drive_size_gb": 100,
-      "drive_type": "universal"
-    },
-    "pg_config": null,
-    "metrics": null,
-    "nodes": null,
-    "total_drives": 9,
-    "mode": null,
-    "error": null,
-    "timings": {
-      "benchmark_s": 156.22510528564453,
-      "trial_total_s": 447.8408992290497,
-      "redis_deploy_s": 0.0,
-      "minio_deploy_s": 131.5266306400299,
-      "minio_destroy_s": 60.057451009750366,
-      "baseline_s": 57.50341534614563,
-      "pg_ready_s": 0.0,
-      "pgbench_init_s": 0.0,
-      "meili_ready_s": 0.0,
-      "dataset_gen_s": 0.0,
-      "indexing_s": 0.0,
-      "terraform_s": 0.0,
-      "vm_ready_s": 0.0
-    },
-    "system_baseline": {
-      "fio": {
-        "rand_read_iops": 5988.750562,
-        "rand_write_iops": 2580.420979,
-        "rand_read_lat_ms": 0.6600753623110001,
-        "rand_write_lat_ms": 0.011044414387999999,
-        "seq_read_mib_s": 94.533203125,
-        "seq_write_mib_s": 375.7841796875
-      },
-      "sysbench": {
-        "cpu_events_per_sec": 3448.06,
-        "mem_mib_per_sec": 24158.81
-      }
-    }
-  },
-  {
-    "id": null,
-    "trial": 19,
-    "timestamp": "2025-12-28T17:14:58.590292",
-    "service": "minio",
-    "cloud": "selectel",
-    "login": null,
-    "infra": null,
-    "infra_config": null,
-    "config": {
-      "nodes": 4,
-      "cpu_per_node": 8,
-      "ram_per_node": 8,
-      "drives_per_node": 1,
-      "drive_size_gb": 100,
-      "drive_type": "basic"
-    },
-    "pg_config": null,
-    "metrics": null,
-    "nodes": null,
-    "total_drives": 4,
-    "mode": null,
-    "error": null,
-    "timings": {
-      "benchmark_s": 284.5936541557312,
-      "trial_total_s": 580.5257289409637,
-      "redis_deploy_s": 0.0,
-      "minio_deploy_s": 132.65004587173462,
-      "minio_destroy_s": 60.13301968574524,
-      "baseline_s": 58.901933670043945,
-      "pg_ready_s": 0.0,
-      "pgbench_init_s": 0.0,
-      "meili_ready_s": 0.0,
-      "dataset_gen_s": 0.0,
-      "indexing_s": 0.0,
-      "terraform_s": 0.0,
-      "vm_ready_s": 0.0
-    },
-    "system_baseline": {
-      "fio": {
-        "rand_read_iops": 384.807596,
-        "rand_write_iops": 171.314343,
-        "rand_read_lat_ms": 10.384272819221,
-        "rand_write_lat_ms": 0.011455502334,
-        "seq_read_mib_s": 46.78515625,
-        "seq_write_mib_s": 93.0458984375
-      },
-      "sysbench": {
-        "cpu_events_per_sec": 3592.81,
-        "mem_mib_per_sec": 25304.81
-      }
-    }
-  },
-  {
-    "id": null,
-    "trial": 20,
-    "timestamp": "2025-12-28T17:24:01.548139",
-    "service": "minio",
-    "cloud": "selectel",
-    "login": null,
-    "infra": null,
-    "infra_config": null,
-    "config": {
-      "nodes": 1,
-      "cpu_per_node": 2,
-      "ram_per_node": 32,
-      "drives_per_node": 4,
-      "drive_size_gb": 100,
-      "drive_type": "fast"
-    },
-    "pg_config": null,
-    "metrics": null,
-    "nodes": null,
-    "total_drives": 4,
-    "mode": null,
-    "error": null,
-    "timings": {
-      "benchmark_s": 223.26243615150452,
-      "trial_total_s": 542.9100868701935,
-      "redis_deploy_s": 0.0,
-      "minio_deploy_s": 153.99765253067017,
-      "minio_destroy_s": 50.68778681755066,
-      "baseline_s": 49.4681293964386,
-      "pg_ready_s": 0.0,
-      "pgbench_init_s": 0.0,
-      "meili_ready_s": 0.0,
-      "dataset_gen_s": 0.0,
-      "indexing_s": 0.0,
-      "terraform_s": 0.0,
-      "vm_ready_s": 0.0
-    },
-    "system_baseline": {
-      "fio": {
-        "rand_read_iops": 8781.721828,
-        "rand_write_iops": 3783.621638,
-        "rand_read_lat_ms": 0.450752970624,
-        "rand_write_lat_ms": 0.007878389930999999,
-        "seq_read_mib_s": 264.8203125,
-        "seq_write_mib_s": 345.841796875
-      },
-      "sysbench": {
-        "cpu_events_per_sec": 3576.11,
-        "mem_mib_per_sec": 25351.2
-      }
-    }
-  },
-  {
-    "id": null,
-    "trial": 27,
-    "timestamp": "2025-12-28T17:34:37.906016",
-    "service": "minio",
-    "cloud": "selectel",
-    "login": null,
-    "infra": null,
-    "infra_config": null,
-    "config": {
-      "nodes": 2,
-      "cpu_per_node": 4,
-      "ram_per_node": 4,
-      "drives_per_node": 1,
-      "drive_size_gb": 200,
-      "drive_type": "universal"
-    },
-    "pg_config": null,
-    "metrics": null,
-    "nodes": null,
-    "total_drives": 2,
-    "mode": null,
-    "error": null,
-    "timings": {
-      "benchmark_s": 182.42056965827942,
-      "trial_total_s": 496.69187664985657,
-      "redis_deploy_s": 0.0,
-      "minio_deploy_s": 132.99104619026184,
-      "minio_destroy_s": 78.3680808544159,
-      "baseline_s": 55.03449749946594,
-      "pg_ready_s": 0.0,
-      "pgbench_init_s": 0.0,
-      "meili_ready_s": 0.0,
-      "dataset_gen_s": 0.0,
-      "indexing_s": 0.0,
-      "terraform_s": 0.0,
-      "vm_ready_s": 0.0
-    },
-    "system_baseline": {
-      "fio": {
-        "rand_read_iops": 7032.19839,
-        "rand_write_iops": 3036.648168,
-        "rand_read_lat_ms": 0.5632409697340001,
-        "rand_write_lat_ms": 0.009518674344999999,
-        "seq_read_mib_s": 200.458984375,
-        "seq_write_mib_s": 47.7490234375
-      },
-      "sysbench": {
-        "cpu_events_per_sec": 3578.38,
-        "mem_mib_per_sec": 25301.19
-      }
-    }
-  },
-  {
-    "id": null,
-    "trial": 28,
-    "timestamp": "2025-12-28T18:34:44.700550",
-    "service": "minio",
-    "cloud": "selectel",
-    "login": null,
-    "infra": null,
-    "infra_config": null,
-    "config": {
-      "nodes": 4,
-      "cpu_per_node": 4,
-      "ram_per_node": 16,
-      "drives_per_node": 2,
-      "drive_size_gb": 100,
-      "drive_type": "universal"
-    },
-    "pg_config": null,
-    "metrics": null,
-    "nodes": null,
-    "total_drives": 8,
-    "mode": null,
-    "error": null,
-    "timings": {
-      "benchmark_s": 165.0708703994751,
-      "trial_total_s": 444.790198802948,
-      "redis_deploy_s": 0.0,
-      "minio_deploy_s": 114.67710971832275,
-      "minio_destroy_s": 70.42620658874512,
-      "baseline_s": 56.67668175697327,
-      "pg_ready_s": 0.0,
-      "pgbench_init_s": 0.0,
-      "meili_ready_s": 0.0,
-      "dataset_gen_s": 0.0,
-      "indexing_s": 0.0,
-      "terraform_s": 0.0,
-      "vm_ready_s": 0.0
-    },
-    "system_baseline": {
-      "fio": {
-        "rand_read_iops": 7033.59832,
-        "rand_write_iops": 3038.248088,
-        "rand_read_lat_ms": 0.5638031526170001,
-        "rand_write_lat_ms": 0.008023408406,
-        "seq_read_mib_s": 94.7802734375,
-        "seq_write_mib_s": 416.0029296875
-      },
-      "sysbench": {
-        "cpu_events_per_sec": 3603.27,
-        "mem_mib_per_sec": 25420.54
-      }
-    }
-  },
-  {
-    "id": null,
     "trial": 24,
     "timestamp": "2025-12-30T10:43:44.771591",
     "service": "postgres",
@@ -2905,6 +2223,816 @@
       "trial_total_s": 226.34401988983154,
       "redis_deploy_s": 127.52642345428467,
       "minio_deploy_s": 0.0,
+      "minio_destroy_s": 0.0,
+      "baseline_s": 0.0,
+      "pg_ready_s": 0.0,
+      "pgbench_init_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 0.0,
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0
+    },
+    "system_baseline": null
+  },
+  {
+    "id": null,
+    "trial": 0,
+    "timestamp": "2025-12-28T15:58:33.679260",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": null,
+    "infra": null,
+    "infra_config": null,
+    "config": {
+      "nodes": 2,
+      "cpu_per_node": 2,
+      "ram_per_node": 4,
+      "drives_per_node": 1,
+      "drive_size_gb": 200,
+      "drive_type": "fast"
+    },
+    "pg_config": null,
+    "metrics": null,
+    "nodes": null,
+    "total_drives": 2,
+    "mode": null,
+    "error": null,
+    "timings": {
+      "benchmark_s": 169.0670874118805,
+      "trial_total_s": 464.65902519226074,
+      "redis_deploy_s": 0.0,
+      "minio_deploy_s": 140.72033190727234,
+      "minio_destroy_s": 36.85264468193054,
+      "baseline_s": 49.070234060287476,
+      "pg_ready_s": 0.0,
+      "pgbench_init_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 0.0,
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 6867.463254,
+        "rand_write_iops": 2965.90341,
+        "rand_read_lat_ms": 0.574854969592,
+        "rand_write_lat_ms": 0.011394617828000001,
+        "seq_read_mib_s": 342.8310546875,
+        "seq_write_mib_s": 249.2939453125
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3453.38,
+        "mem_mib_per_sec": 21781.75
+      }
+    }
+  },
+  {
+    "id": null,
+    "trial": 1,
+    "timestamp": "2025-12-28T16:05:35.177155",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": null,
+    "infra": null,
+    "infra_config": null,
+    "config": {
+      "nodes": 1,
+      "cpu_per_node": 4,
+      "ram_per_node": 32,
+      "drives_per_node": 4,
+      "drive_size_gb": 100,
+      "drive_type": "universal"
+    },
+    "pg_config": null,
+    "metrics": null,
+    "nodes": null,
+    "total_drives": 4,
+    "mode": null,
+    "error": null,
+    "timings": {
+      "benchmark_s": 115.01261687278748,
+      "trial_total_s": 421.44186186790466,
+      "redis_deploy_s": 0.0,
+      "minio_deploy_s": 152.72295689582825,
+      "minio_destroy_s": 53.495217084884644,
+      "baseline_s": 56.961562395095825,
+      "pg_ready_s": 0.0,
+      "pgbench_init_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 0.0,
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 7034.548273,
+        "rand_write_iops": 3037.9981,
+        "rand_read_lat_ms": 0.563339479914,
+        "rand_write_lat_ms": 0.008687656304,
+        "seq_read_mib_s": 94.880859375,
+        "seq_write_mib_s": 416.951171875
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3578.96,
+        "mem_mib_per_sec": 25297.52
+      }
+    }
+  },
+  {
+    "id": null,
+    "trial": 2,
+    "timestamp": "2025-12-28T16:15:01.477206",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": null,
+    "infra": null,
+    "infra_config": null,
+    "config": {
+      "nodes": 4,
+      "cpu_per_node": 4,
+      "ram_per_node": 32,
+      "drives_per_node": 2,
+      "drive_size_gb": 100,
+      "drive_type": "basic"
+    },
+    "pg_config": null,
+    "metrics": null,
+    "nodes": null,
+    "total_drives": 8,
+    "mode": null,
+    "error": null,
+    "timings": {
+      "benchmark_s": 235.69440746307373,
+      "trial_total_s": 566.2445001602173,
+      "redis_deploy_s": 0.0,
+      "minio_deploy_s": 152.35136485099792,
+      "minio_destroy_s": 72.76444387435913,
+      "baseline_s": 59.837361335754395,
+      "pg_ready_s": 0.0,
+      "pgbench_init_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 0.0,
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 384.91528,
+        "rand_write_iops": 171.040136,
+        "rand_read_lat_ms": 10.383571541228,
+        "rand_write_lat_ms": 0.010558145821,
+        "seq_read_mib_s": 52.71484375,
+        "seq_write_mib_s": 131.09765625
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3446.9,
+        "mem_mib_per_sec": 24648.11
+      }
+    }
+  },
+  {
+    "id": null,
+    "trial": 3,
+    "timestamp": "2025-12-28T16:22:03.780433",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": null,
+    "infra": null,
+    "infra_config": null,
+    "config": {
+      "nodes": 3,
+      "cpu_per_node": 4,
+      "ram_per_node": 16,
+      "drives_per_node": 3,
+      "drive_size_gb": 200,
+      "drive_type": "universal"
+    },
+    "pg_config": null,
+    "metrics": null,
+    "nodes": null,
+    "total_drives": 9,
+    "mode": null,
+    "error": null,
+    "timings": {
+      "benchmark_s": 128.84004497528076,
+      "trial_total_s": 422.257244348526,
+      "redis_deploy_s": 0.0,
+      "minio_deploy_s": 126.76432919502258,
+      "minio_destroy_s": 59.37546396255493,
+      "baseline_s": 56.75616765022278,
+      "pg_ready_s": 0.0,
+      "pgbench_init_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 0.0,
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 6357.832108,
+        "rand_write_iops": 2743.512824,
+        "rand_read_lat_ms": 0.622019402507,
+        "rand_write_lat_ms": 0.010053066188999999,
+        "seq_read_mib_s": 95.076171875,
+        "seq_write_mib_s": 415.1259765625
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3454.73,
+        "mem_mib_per_sec": 24247.15
+      }
+    }
+  },
+  {
+    "id": null,
+    "trial": 4,
+    "timestamp": "2025-12-28T16:28:41.568747",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": null,
+    "infra": null,
+    "infra_config": null,
+    "config": {
+      "nodes": 1,
+      "cpu_per_node": 8,
+      "ram_per_node": 8,
+      "drives_per_node": 4,
+      "drive_size_gb": 200,
+      "drive_type": "fast"
+    },
+    "pg_config": null,
+    "metrics": null,
+    "nodes": null,
+    "total_drives": 4,
+    "mode": null,
+    "error": null,
+    "timings": {
+      "benchmark_s": 115.94567728042603,
+      "trial_total_s": 397.74508142471313,
+      "redis_deploy_s": 0.0,
+      "minio_deploy_s": 129.346910238266,
+      "minio_destroy_s": 54.2421190738678,
+      "baseline_s": 49.27939748764038,
+      "pg_ready_s": 0.0,
+      "pgbench_init_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 0.0,
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8939.40303,
+        "rand_write_iops": 3846.957652,
+        "rand_read_lat_ms": 0.442748535166,
+        "rand_write_lat_ms": 0.00802579143,
+        "seq_read_mib_s": 337.4306640625,
+        "seq_write_mib_s": 281.28125
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3444.59,
+        "mem_mib_per_sec": 24731.03
+      }
+    }
+  },
+  {
+    "id": null,
+    "trial": 5,
+    "timestamp": "2025-12-28T16:36:15.488372",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": null,
+    "infra": null,
+    "infra_config": null,
+    "config": {
+      "nodes": 2,
+      "cpu_per_node": 2,
+      "ram_per_node": 4,
+      "drives_per_node": 2,
+      "drive_size_gb": 100,
+      "drive_type": "universal"
+    },
+    "pg_config": null,
+    "metrics": null,
+    "nodes": null,
+    "total_drives": 4,
+    "mode": null,
+    "error": "Benchmark failed",
+    "timings": {
+      "benchmark_s": 4.475951671600342,
+      "trial_total_s": 453.87670493125916,
+      "redis_deploy_s": 0.0,
+      "minio_deploy_s": 393.0366187095642,
+      "minio_destroy_s": 0.0,
+      "baseline_s": 12.96782898902893,
+      "pg_ready_s": 0.0,
+      "pgbench_init_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 0.0,
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0
+    },
+    "system_baseline": {
+      "fio": null,
+      "sysbench": {
+        "cpu_events_per_sec": 0.0,
+        "mem_mib_per_sec": 0.0
+      }
+    }
+  },
+  {
+    "id": null,
+    "trial": 11,
+    "timestamp": "2025-12-28T16:48:52.827931",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": null,
+    "infra": null,
+    "infra_config": null,
+    "config": {
+      "nodes": 1,
+      "cpu_per_node": 8,
+      "ram_per_node": 8,
+      "drives_per_node": 4,
+      "drive_size_gb": 100,
+      "drive_type": "universal"
+    },
+    "pg_config": null,
+    "metrics": null,
+    "nodes": null,
+    "total_drives": 4,
+    "mode": null,
+    "error": null,
+    "timings": {
+      "benchmark_s": 114.94692492485046,
+      "trial_total_s": 461.1162791252136,
+      "redis_deploy_s": 0.0,
+      "minio_deploy_s": 147.0935719013214,
+      "minio_destroy_s": 42.131760120391846,
+      "baseline_s": 55.1821825504303,
+      "pg_ready_s": 0.0,
+      "pgbench_init_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 0.0,
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 7023.298835,
+        "rand_write_iops": 3033.348333,
+        "rand_read_lat_ms": 0.564707668271,
+        "rand_write_lat_ms": 0.008202304055,
+        "seq_read_mib_s": 119.8515625,
+        "seq_write_mib_s": 93.029296875
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3580.94,
+        "mem_mib_per_sec": 25225.26
+      }
+    }
+  },
+  {
+    "id": null,
+    "trial": 16,
+    "timestamp": "2025-12-28T16:57:50.075814",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": null,
+    "infra": null,
+    "infra_config": null,
+    "config": {
+      "nodes": 1,
+      "cpu_per_node": 8,
+      "ram_per_node": 32,
+      "drives_per_node": 4,
+      "drive_size_gb": 100,
+      "drive_type": "basic"
+    },
+    "pg_config": null,
+    "metrics": null,
+    "nodes": null,
+    "total_drives": 4,
+    "mode": null,
+    "error": null,
+    "timings": {
+      "benchmark_s": 243.071222782135,
+      "trial_total_s": 537.0214676856995,
+      "redis_deploy_s": 0.0,
+      "minio_deploy_s": 146.04055404663086,
+      "minio_destroy_s": 51.6465322971344,
+      "baseline_s": 59.36988973617554,
+      "pg_ready_s": 0.0,
+      "pgbench_init_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 0.0,
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 384.822901,
+        "rand_write_iops": 171.604136,
+        "rand_read_lat_ms": 10.383848375957,
+        "rand_write_lat_ms": 0.010822231732,
+        "seq_read_mib_s": 47.6708984375,
+        "seq_write_mib_s": 140.0322265625
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3600.75,
+        "mem_mib_per_sec": 24931.17
+      }
+    }
+  },
+  {
+    "id": null,
+    "trial": 18,
+    "timestamp": "2025-12-28T17:05:18.012555",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": null,
+    "infra": null,
+    "infra_config": null,
+    "config": {
+      "nodes": 3,
+      "cpu_per_node": 4,
+      "ram_per_node": 16,
+      "drives_per_node": 3,
+      "drive_size_gb": 100,
+      "drive_type": "universal"
+    },
+    "pg_config": null,
+    "metrics": null,
+    "nodes": null,
+    "total_drives": 9,
+    "mode": null,
+    "error": null,
+    "timings": {
+      "benchmark_s": 156.22510528564453,
+      "trial_total_s": 447.8408992290497,
+      "redis_deploy_s": 0.0,
+      "minio_deploy_s": 131.5266306400299,
+      "minio_destroy_s": 60.057451009750366,
+      "baseline_s": 57.50341534614563,
+      "pg_ready_s": 0.0,
+      "pgbench_init_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 0.0,
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 5988.750562,
+        "rand_write_iops": 2580.420979,
+        "rand_read_lat_ms": 0.6600753623110001,
+        "rand_write_lat_ms": 0.011044414387999999,
+        "seq_read_mib_s": 94.533203125,
+        "seq_write_mib_s": 375.7841796875
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3448.06,
+        "mem_mib_per_sec": 24158.81
+      }
+    }
+  },
+  {
+    "id": null,
+    "trial": 19,
+    "timestamp": "2025-12-28T17:14:58.590292",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": null,
+    "infra": null,
+    "infra_config": null,
+    "config": {
+      "nodes": 4,
+      "cpu_per_node": 8,
+      "ram_per_node": 8,
+      "drives_per_node": 1,
+      "drive_size_gb": 100,
+      "drive_type": "basic"
+    },
+    "pg_config": null,
+    "metrics": null,
+    "nodes": null,
+    "total_drives": 4,
+    "mode": null,
+    "error": null,
+    "timings": {
+      "benchmark_s": 284.5936541557312,
+      "trial_total_s": 580.5257289409637,
+      "redis_deploy_s": 0.0,
+      "minio_deploy_s": 132.65004587173462,
+      "minio_destroy_s": 60.13301968574524,
+      "baseline_s": 58.901933670043945,
+      "pg_ready_s": 0.0,
+      "pgbench_init_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 0.0,
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 384.807596,
+        "rand_write_iops": 171.314343,
+        "rand_read_lat_ms": 10.384272819221,
+        "rand_write_lat_ms": 0.011455502334,
+        "seq_read_mib_s": 46.78515625,
+        "seq_write_mib_s": 93.0458984375
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3592.81,
+        "mem_mib_per_sec": 25304.81
+      }
+    }
+  },
+  {
+    "id": null,
+    "trial": 20,
+    "timestamp": "2025-12-28T17:24:01.548139",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": null,
+    "infra": null,
+    "infra_config": null,
+    "config": {
+      "nodes": 1,
+      "cpu_per_node": 2,
+      "ram_per_node": 32,
+      "drives_per_node": 4,
+      "drive_size_gb": 100,
+      "drive_type": "fast"
+    },
+    "pg_config": null,
+    "metrics": null,
+    "nodes": null,
+    "total_drives": 4,
+    "mode": null,
+    "error": null,
+    "timings": {
+      "benchmark_s": 223.26243615150452,
+      "trial_total_s": 542.9100868701935,
+      "redis_deploy_s": 0.0,
+      "minio_deploy_s": 153.99765253067017,
+      "minio_destroy_s": 50.68778681755066,
+      "baseline_s": 49.4681293964386,
+      "pg_ready_s": 0.0,
+      "pgbench_init_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 0.0,
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8781.721828,
+        "rand_write_iops": 3783.621638,
+        "rand_read_lat_ms": 0.450752970624,
+        "rand_write_lat_ms": 0.007878389930999999,
+        "seq_read_mib_s": 264.8203125,
+        "seq_write_mib_s": 345.841796875
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3576.11,
+        "mem_mib_per_sec": 25351.2
+      }
+    }
+  },
+  {
+    "id": null,
+    "trial": 27,
+    "timestamp": "2025-12-28T17:34:37.906016",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": null,
+    "infra": null,
+    "infra_config": null,
+    "config": {
+      "nodes": 2,
+      "cpu_per_node": 4,
+      "ram_per_node": 4,
+      "drives_per_node": 1,
+      "drive_size_gb": 200,
+      "drive_type": "universal"
+    },
+    "pg_config": null,
+    "metrics": null,
+    "nodes": null,
+    "total_drives": 2,
+    "mode": null,
+    "error": null,
+    "timings": {
+      "benchmark_s": 182.42056965827942,
+      "trial_total_s": 496.69187664985657,
+      "redis_deploy_s": 0.0,
+      "minio_deploy_s": 132.99104619026184,
+      "minio_destroy_s": 78.3680808544159,
+      "baseline_s": 55.03449749946594,
+      "pg_ready_s": 0.0,
+      "pgbench_init_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 0.0,
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 7032.19839,
+        "rand_write_iops": 3036.648168,
+        "rand_read_lat_ms": 0.5632409697340001,
+        "rand_write_lat_ms": 0.009518674344999999,
+        "seq_read_mib_s": 200.458984375,
+        "seq_write_mib_s": 47.7490234375
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3578.38,
+        "mem_mib_per_sec": 25301.19
+      }
+    }
+  },
+  {
+    "id": null,
+    "trial": 28,
+    "timestamp": "2025-12-28T18:34:44.700550",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": null,
+    "infra": null,
+    "infra_config": null,
+    "config": {
+      "nodes": 4,
+      "cpu_per_node": 4,
+      "ram_per_node": 16,
+      "drives_per_node": 2,
+      "drive_size_gb": 100,
+      "drive_type": "universal"
+    },
+    "pg_config": null,
+    "metrics": null,
+    "nodes": null,
+    "total_drives": 8,
+    "mode": null,
+    "error": null,
+    "timings": {
+      "benchmark_s": 165.0708703994751,
+      "trial_total_s": 444.790198802948,
+      "redis_deploy_s": 0.0,
+      "minio_deploy_s": 114.67710971832275,
+      "minio_destroy_s": 70.42620658874512,
+      "baseline_s": 56.67668175697327,
+      "pg_ready_s": 0.0,
+      "pgbench_init_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 0.0,
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0
+    },
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 7033.59832,
+        "rand_write_iops": 3038.248088,
+        "rand_read_lat_ms": 0.5638031526170001,
+        "rand_write_lat_ms": 0.008023408406,
+        "seq_read_mib_s": 94.7802734375,
+        "seq_write_mib_s": 416.0029296875
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3603.27,
+        "mem_mib_per_sec": 25420.54
+      }
+    }
+  },
+  {
+    "id": 0,
+    "trial": 0,
+    "timestamp": "2026-02-09T06:39:08.110962",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "infra": null,
+    "infra_config": null,
+    "config": {
+      "nodes": 1,
+      "cpu_per_node": 4,
+      "ram_per_node": 4,
+      "drives_per_node": 1,
+      "drive_size_gb": 200,
+      "drive_type": "basicssd"
+    },
+    "pg_config": null,
+    "metrics": {
+      "ops_per_sec": null,
+      "avg_latency_ms": null,
+      "p50_latency_ms": null,
+      "p99_latency_ms": null,
+      "p999_latency_ms": null,
+      "kb_per_sec": null,
+      "qps": null,
+      "p50_ms": null,
+      "p95_ms": null,
+      "p99_ms": null,
+      "error_rate": null,
+      "indexing_time_s": null,
+      "tps": null,
+      "latency_avg_ms": null,
+      "latency_stddev_ms": null,
+      "transactions": null,
+      "total_mib_s": 0.0,
+      "get_mib_s": 0.0,
+      "put_mib_s": 0.0,
+      "duration_s": 0.0
+    },
+    "nodes": null,
+    "total_drives": 1,
+    "mode": null,
+    "error": "Benchmark failed",
+    "timings": {
+      "benchmark_s": 3.7954294681549072,
+      "trial_total_s": 429.5204224586487,
+      "redis_deploy_s": 0.0,
+      "minio_deploy_s": 367.61605763435364,
+      "minio_destroy_s": 0.0,
+      "baseline_s": 16.686316967010498,
+      "pg_ready_s": 0.0,
+      "pgbench_init_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 0.0,
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0
+    },
+    "system_baseline": {
+      "fio": null,
+      "sysbench": {
+        "cpu_events_per_sec": 0.0,
+        "mem_mib_per_sec": 0.0
+      }
+    }
+  },
+  {
+    "id": 3,
+    "trial": 3,
+    "timestamp": "2026-02-09T07:13:48.531270",
+    "service": "minio",
+    "cloud": "selectel",
+    "login": "tebuchet@gmail.com",
+    "infra": null,
+    "infra_config": null,
+    "config": {
+      "nodes": 1,
+      "cpu_per_node": 4,
+      "ram_per_node": 4,
+      "drives_per_node": 1,
+      "drive_size_gb": 200,
+      "drive_type": "basicssd"
+    },
+    "pg_config": null,
+    "metrics": {
+      "ops_per_sec": null,
+      "avg_latency_ms": null,
+      "p50_latency_ms": null,
+      "p99_latency_ms": null,
+      "p999_latency_ms": null,
+      "kb_per_sec": null,
+      "qps": null,
+      "p50_ms": null,
+      "p95_ms": null,
+      "p99_ms": null,
+      "error_rate": null,
+      "indexing_time_s": null,
+      "tps": null,
+      "latency_avg_ms": null,
+      "latency_stddev_ms": null,
+      "transactions": null,
+      "total_mib_s": 0.0,
+      "get_mib_s": 0.0,
+      "put_mib_s": 0.0,
+      "duration_s": 0.0
+    },
+    "nodes": null,
+    "total_drives": 1,
+    "mode": null,
+    "error": "Deploy failed",
+    "timings": {
+      "benchmark_s": 0.0,
+      "trial_total_s": 68.71595335006714,
+      "redis_deploy_s": 0.0,
+      "minio_deploy_s": 19.0950288772583,
       "minio_destroy_s": 0.0,
       "baseline_s": 0.0,
       "pg_ready_s": 0.0,
