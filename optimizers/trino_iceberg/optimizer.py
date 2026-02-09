@@ -1002,9 +1002,13 @@ def objective_cluster(
         minio_topology = trial.suggest_categorical(
             "minio_topology", cluster_space["minio_topology"]
         )
-        minio_nodes = trial.suggest_categorical(
-            "minio_nodes", cluster_space["minio_nodes"]
-        )
+        # Only sample nodes for cluster mode (solo always uses 1 node)
+        if minio_topology == "cluster":
+            minio_nodes = trial.suggest_categorical(
+                "minio_nodes", cluster_space["minio_nodes"]
+            )
+        else:
+            minio_nodes = 1
         minio_cpu = trial.suggest_categorical("minio_cpu", cluster_space["minio_cpu"])
         minio_ram_gb = trial.suggest_categorical(
             "minio_ram_gb", cluster_space["minio_ram_gb"]

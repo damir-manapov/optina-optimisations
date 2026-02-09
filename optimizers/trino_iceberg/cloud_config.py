@@ -53,7 +53,7 @@ def get_cluster_search_space(cloud: str) -> dict:
         # MinIO topology
         "minio_enabled": [False, True],  # Use external MinIO cluster
         "minio_topology": ["solo", "cluster"],  # MinIO mode when enabled
-        "minio_nodes": [4],  # Number of MinIO nodes (min 4 for distributed)
+        "minio_nodes": [4, 8],  # Number of MinIO nodes (cluster mode only, min 4)
         "minio_cpu": [2, 4],  # MinIO CPU per node
         "minio_ram_gb": [4, 8],  # MinIO RAM per node
         "minio_disk_size_gb": [50, 100],  # MinIO disk per node
