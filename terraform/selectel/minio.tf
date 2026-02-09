@@ -167,8 +167,8 @@ locals {
     var.minio_node_count == 1 && var.minio_drives_per_node == 1
     ? "/data1"
     : var.minio_node_count == 1
-      ? "/data{1...${var.minio_drives_per_node}}"
-      : "http://minio{1...${var.minio_node_count}}:9000/data{1...${var.minio_drives_per_node}}"
+    ? "/data{1...${var.minio_drives_per_node}}"
+    : "http://minio{1...${var.minio_node_count}}:9000/data{1...${var.minio_drives_per_node}}"
   )
 
   minio_cloud_init = templatefile("${path.module}/minio-cloud-init.yaml", {

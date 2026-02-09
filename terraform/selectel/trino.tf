@@ -87,7 +87,7 @@ resource "openstack_networking_secgroup_rule_v2" "trino_postgres" {
   protocol          = "tcp"
   port_range_min    = 5432
   port_range_max    = 5432
-  remote_ip_prefix  = "10.0.0.40/32"  # Only from Trino node itself
+  remote_ip_prefix  = "10.0.0.40/32" # Only from Trino node itself
   security_group_id = openstack_networking_secgroup_v2.benchmark.id
 }
 

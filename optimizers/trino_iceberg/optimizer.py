@@ -26,7 +26,6 @@ Usage:
 
 import argparse
 import json
-import re
 import sys
 import time
 from dataclasses import dataclass
@@ -41,7 +40,6 @@ from optuna.samplers import TPESampler
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from common import (
-    InfraTimings,
     SystemBaseline,
     destroy_all,
     get_metric,
@@ -158,7 +156,7 @@ def wait_for_trino_ready(
         code, output = run_ssh_command(vm_ip, cmd, timeout=10, jump_host=jump_host)
         if code == 0 and output.strip() == "200":
             # Also verify we can run a simple query
-            test_cmd = f"trino --execute 'SELECT 1' 2>/dev/null"
+            test_cmd = "trino --execute 'SELECT 1' 2>/dev/null"
             code, _ = run_ssh_command(vm_ip, test_cmd, timeout=30, jump_host=jump_host)
             if code == 0:
                 print(f"  Trino ready in {time.time() - start:.1f}s")
@@ -191,7 +189,9 @@ def generate_trino_config(trino_config: dict, ram_gb: int) -> dict[str, str]:
     Returns dict mapping filename to content.
     """
     heap_mb = int(ram_gb * 1024 * trino_config["trino_heap_pct"] / 100)
-    query_max_memory_mb = int(heap_mb * trino_config["trino_query_max_memory_pct"] / 100)
+    query_max_memory_mb = int(
+        heap_mb * trino_config["trino_query_max_memory_pct"] / 100
+    )
 
     jvm_config = f"""-server
 -Xmx{heap_mb}m
@@ -229,7 +229,9 @@ def generate_iceberg_table_properties(trino_config: dict) -> dict[str, str]:
 
     # Add compression level for algorithms that support it
     if trino_config["compression"] in ["zstd", "gzip"]:
-        props["write.parquet.compression-level"] = str(trino_config["compression_level"])
+        props["write.parquet.compression-level"] = str(
+            trino_config["compression_level"]
+        )
 
     # Target file size
     props["write.target-file-size-bytes"] = str(
@@ -334,34 +336,65 @@ def generate_data(
 
     # Create scenario file for samples-generation
     # Using the 'simple' scenario with lookup-friendly schema
-    scenario_json = json.dumps({
-        "name": "benchmark_data",
-        "steps": [
-            {
-                "table": {
-                    "name": "benchmark",
-                    "columns": [
-                        {"name": "id", "type": "bigint", "generator": {"kind": "sequence", "start": 1}},
-                        {"name": "category", "type": "string", "generator": {"kind": "choice", "values": ["A", "B", "C", "D", "E"]}},
-                        {"name": "value", "type": "float", "generator": {"kind": "randomFloat", "min": 0, "max": 1000}},
-                        {"name": "name", "type": "string", "generator": {"kind": "randomString", "length": 20}},
-                        {"name": "created_at", "type": "datetime", "generator": {"kind": "datetime"}},
-                    ]
-                },
-                "rowCount": row_count,
-            }
-        ]
-    })
+    scenario_json = json.dumps(
+        {
+            "name": "benchmark_data",
+            "steps": [
+                {
+                    "table": {
+                        "name": "benchmark",
+                        "columns": [
+                            {
+                                "name": "id",
+                                "type": "bigint",
+                                "generator": {"kind": "sequence", "start": 1},
+                            },
+                            {
+                                "name": "category",
+                                "type": "string",
+                                "generator": {
+                                    "kind": "choice",
+                                    "values": ["A", "B", "C", "D", "E"],
+                                },
+                            },
+                            {
+                                "name": "value",
+                                "type": "float",
+                                "generator": {
+                                    "kind": "randomFloat",
+                                    "min": 0,
+                                    "max": 1000,
+                                },
+                            },
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "generator": {"kind": "randomString", "length": 20},
+                            },
+                            {
+                                "name": "created_at",
+                                "type": "datetime",
+                                "generator": {"kind": "datetime"},
+                            },
+                        ],
+                    },
+                    "rowCount": row_count,
+                }
+            ],
+        }
+    )
 
     # Write scenario to VM
     write_scenario_cmd = f"cat > /tmp/benchmark_scenario.json << 'EOFSCENARIO'\n{scenario_json}\nEOFSCENARIO"
-    code, output = run_ssh_command(vm_ip, write_scenario_cmd, timeout=30, jump_host=jump_host)
+    code, output = run_ssh_command(
+        vm_ip, write_scenario_cmd, timeout=30, jump_host=jump_host
+    )
     if code != 0:
         print(f"  Failed to write scenario: {output}")
         return False, 0
 
     # First drop existing table if any
-    drop_cmd = f"trino --execute \"DROP TABLE IF EXISTS iceberg.warehouse.benchmark\" 2>/dev/null || true"
+    drop_cmd = 'trino --execute "DROP TABLE IF EXISTS iceberg.warehouse.benchmark" 2>/dev/null || true'
     run_ssh_command(vm_ip, drop_cmd, timeout=60, jump_host=jump_host)
 
     # Generate data using npx tsx
@@ -386,17 +419,25 @@ npx tsx scripts/generate-all.ts \
     # Apply table properties (compression, partitioning) by recreating table
     # samples-generation creates a basic table, we need to recreate with our settings
     if table_props or partition_spec:
-        props_sql = ", ".join(f"'{k}' = '{v}'" for k, v in table_props.items())
+        # Build WITH clause for table properties
+        props_clause = ""
+        if table_props:
+            props_items = ", ".join(f"'{k}' = '{v}'" for k, v in table_props.items())
+            props_clause = f"WITH ({props_items})"
+
         recreate_cmd = f"""
 trino --execute "
 CREATE TABLE iceberg.warehouse.benchmark_opt
 {partition_spec}
+{props_clause}
 AS SELECT * FROM iceberg.warehouse.benchmark
-" 2>&1 && \
-trino --execute "DROP TABLE iceberg.warehouse.benchmark" 2>&1 && \
+" 2>&1 && \\
+trino --execute "DROP TABLE iceberg.warehouse.benchmark" 2>&1 && \\
 trino --execute "ALTER TABLE iceberg.warehouse.benchmark_opt RENAME TO benchmark" 2>&1
 """
-        code, output = run_ssh_command(vm_ip, recreate_cmd, timeout=1800, jump_host=jump_host)
+        code, output = run_ssh_command(
+            vm_ip, recreate_cmd, timeout=1800, jump_host=jump_host
+        )
         if code != 0:
             print(f"  Table optimization failed: {output[:300]}")
             # Continue anyway, table exists
@@ -420,7 +461,9 @@ def run_lookup_by_id_benchmark(
     Args:
         warmup: Warmup duration in seconds (JVM JIT, page cache, metadata cache)
     """
-    print(f"  Running lookup benchmark ({warmup}s warmup + {duration}s measured, {concurrency} concurrent) from benchmark VM...")
+    print(
+        f"  Running lookup benchmark ({warmup}s warmup + {duration}s measured, {concurrency} concurrent) from benchmark VM..."
+    )
 
     # Get max ID for random lookups (query from benchmark VM)
     max_id_cmd = f"trino --server http://{trino_ip}:8080 --execute 'SELECT max(id) FROM iceberg.warehouse.benchmark' 2>/dev/null | tail -1"
@@ -501,7 +544,9 @@ print(f"errors={{errors}}")
 
     start = time.time()
     bench_cmd = "python3 /tmp/lookup_bench.py 2>&1"
-    code, output = run_ssh_command(benchmark_ip, bench_cmd, timeout=warmup + duration + 120)
+    code, output = run_ssh_command(
+        benchmark_ip, bench_cmd, timeout=warmup + duration + 120
+    )
     elapsed = time.time() - start
 
     if code != 0:
@@ -655,7 +700,7 @@ def ensure_infra(
     timings.terraform_s = time.time() - tf_start
 
     if ret_code != 0:
-        raise RuntimeError(f"Terraform apply failed: {stderr[:500]}")
+        raise RuntimeError(f"Terraform apply failed: {(stderr or '')[:500]}")
 
     benchmark_ip = get_tf_output(tf, "benchmark_vm_ip")
     trino_ip = get_tf_output(tf, "trino_vm_ip") or TRINO_IP
@@ -724,7 +769,9 @@ def objective_infra(
 
         # Run system baseline
         baseline_start = time.time()
-        baseline = run_system_baseline(trino_ip, jump_host=benchmark_ip, test_path="/data")
+        baseline = run_system_baseline(
+            trino_ip, jump_host=benchmark_ip, test_dir="/data"
+        )
         timings.baseline_s = time.time() - baseline_start
 
         # Setup samples-generation
@@ -733,14 +780,18 @@ def objective_infra(
 
         # Generate data
         data_start = time.time()
-        success, _ = generate_data(trino_ip, trino_config, row_count, jump_host=benchmark_ip)
+        success, _ = generate_data(
+            trino_ip, trino_config, row_count, jump_host=benchmark_ip
+        )
         timings.data_gen_s = time.time() - data_start
         if not success:
             raise RuntimeError("Data generation failed")
 
         # Run benchmark
         bench_start = time.time()
-        result = run_lookup_by_id_benchmark(benchmark_ip, trino_ip, duration=60, concurrency=16)
+        result = run_lookup_by_id_benchmark(
+            benchmark_ip, trino_ip, duration=60, concurrency=16
+        )
         timings.benchmark_s = time.time() - bench_start
 
         result.baseline = baseline
@@ -757,7 +808,14 @@ def objective_infra(
         )
 
         save_result(
-            result, infra_config, trino_config, trial.number, cloud, "infra", cloud_config, login
+            result,
+            infra_config,
+            trino_config,
+            trial.number,
+            cloud,
+            "infra",
+            cloud_config,
+            login,
         )
 
         return get_metric_value(
@@ -792,22 +850,36 @@ def objective_config(
     # Sample Trino configuration
     compression = trial.suggest_categorical("compression", space["compression"])
     valid_levels = filter_compression_levels(compression, space["compression_level"])
-    compression_level = trial.suggest_categorical(f"compression_level_{compression}", valid_levels)
+    compression_level = trial.suggest_categorical(
+        f"compression_level_{compression}", valid_levels
+    )
 
     trino_config = {
-        "trino_heap_pct": trial.suggest_categorical("trino_heap_pct", space["trino_heap_pct"]),
+        "trino_heap_pct": trial.suggest_categorical(
+            "trino_heap_pct", space["trino_heap_pct"]
+        ),
         "trino_query_max_memory_pct": trial.suggest_categorical(
             "trino_query_max_memory_pct", space["trino_query_max_memory_pct"]
         ),
-        "task_concurrency": trial.suggest_categorical("task_concurrency", space["task_concurrency"]),
-        "task_writer_count": trial.suggest_categorical("task_writer_count", space["task_writer_count"]),
+        "task_concurrency": trial.suggest_categorical(
+            "task_concurrency", space["task_concurrency"]
+        ),
+        "task_writer_count": trial.suggest_categorical(
+            "task_writer_count", space["task_writer_count"]
+        ),
         "compression": compression,
         "compression_level": compression_level,
-        "partition_key": trial.suggest_categorical("partition_key", space["partition_key"]),
-        "target_file_size_mb": trial.suggest_categorical("target_file_size_mb", space["target_file_size_mb"]),
+        "partition_key": trial.suggest_categorical(
+            "partition_key", space["partition_key"]
+        ),
+        "target_file_size_mb": trial.suggest_categorical(
+            "target_file_size_mb", space["target_file_size_mb"]
+        ),
     }
 
-    print(f"\n[Trial {trial.number}] Config: compression={compression}, partition={trino_config['partition_key']}")
+    print(
+        f"\n[Trial {trial.number}] Config: compression={compression}, partition={trino_config['partition_key']}"
+    )
 
     # Check cache
     cached = find_cached_result(fixed_infra, trino_config, cloud)
@@ -817,19 +889,25 @@ def objective_config(
 
     try:
         # Reconfigure Trino
-        if not reconfigure_trino(trino_ip, trino_config, ram_gb, jump_host=benchmark_ip):
+        if not reconfigure_trino(
+            trino_ip, trino_config, ram_gb, jump_host=benchmark_ip
+        ):
             raise RuntimeError("Failed to reconfigure Trino")
 
         # Regenerate data with new table properties
         data_start = time.time()
-        success, _ = generate_data(trino_ip, trino_config, row_count, jump_host=benchmark_ip)
+        success, _ = generate_data(
+            trino_ip, trino_config, row_count, jump_host=benchmark_ip
+        )
         timings.data_gen_s = time.time() - data_start
         if not success:
             raise RuntimeError("Data generation failed")
 
         # Run benchmark
         bench_start = time.time()
-        result = run_lookup_by_id_benchmark(benchmark_ip, trino_ip, duration=60, concurrency=16)
+        result = run_lookup_by_id_benchmark(
+            benchmark_ip, trino_ip, duration=60, concurrency=16
+        )
         timings.benchmark_s = time.time() - bench_start
 
         result.timings = timings
@@ -845,7 +923,14 @@ def objective_config(
         )
 
         save_result(
-            result, fixed_infra, trino_config, trial.number, cloud, "config", cloud_config, login
+            result,
+            fixed_infra,
+            trino_config,
+            trial.number,
+            cloud,
+            "config",
+            cloud_config,
+            login,
         )
 
         return get_metric_value(
@@ -945,11 +1030,17 @@ def show_results(cloud: str) -> None:
 
     print("\n--- Best Configurations ---")
     best = data["best_lookups"]
-    print(f"Best lookups/s: {best['lookups']:.1f} ({best['cpu']}cpu/{best['ram']}gb, {best['compression']})")
+    print(
+        f"Best lookups/s: {best['lookups']:.1f} ({best['cpu']}cpu/{best['ram']}gb, {best['compression']})"
+    )
     best = data["best_latency"]
-    print(f"Best P99 latency: {best['p99']:.1f}ms ({best['cpu']}cpu/{best['ram']}gb, {best['compression']})")
+    print(
+        f"Best P99 latency: {best['p99']:.1f}ms ({best['cpu']}cpu/{best['ram']}gb, {best['compression']})"
+    )
     best = data["best_efficiency"]
-    print(f"Best efficiency: {best['eff']:.2f} ({best['cpu']}cpu/{best['ram']}gb, {best['compression']})")
+    print(
+        f"Best efficiency: {best['eff']:.2f} ({best['cpu']}cpu/{best['ram']}gb, {best['compression']})"
+    )
 
 
 def export_results_md(cloud: str, output_path: Path | None = None) -> None:
@@ -979,18 +1070,26 @@ def export_results_md(cloud: str, output_path: Path | None = None) -> None:
             f"{row['cost']:.0f} | {row['eff']:.2f} |"
         )
 
-    lines.extend([
-        "",
-        "## Best Configurations",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Best Configurations",
+            "",
+        ]
+    )
 
     best = data["best_lookups"]
-    lines.append(f"- **Best lookups/s**: {best['lookups']:.1f} ({best['cpu']}cpu/{best['ram']}gb, {best['compression']})")
+    lines.append(
+        f"- **Best lookups/s**: {best['lookups']:.1f} ({best['cpu']}cpu/{best['ram']}gb, {best['compression']})"
+    )
     best = data["best_latency"]
-    lines.append(f"- **Best P99 latency**: {best['p99']:.1f}ms ({best['cpu']}cpu/{best['ram']}gb, {best['compression']})")
+    lines.append(
+        f"- **Best P99 latency**: {best['p99']:.1f}ms ({best['cpu']}cpu/{best['ram']}gb, {best['compression']})"
+    )
     best = data["best_efficiency"]
-    lines.append(f"- **Best efficiency**: {best['eff']:.2f} lookups/₽/mo ({best['cpu']}cpu/{best['ram']}gb)")
+    lines.append(
+        f"- **Best efficiency**: {best['eff']:.2f} lookups/₽/mo ({best['cpu']}cpu/{best['ram']}gb)"
+    )
 
     output_path.write_text("\n".join(lines))
     print(f"Results exported to {output_path}")
@@ -1044,7 +1143,9 @@ Examples:
         with_benchmark_vm=False,  # Benchmark runs on same VM
     )
     # Add trino-iceberg specific argument
-    parser.add_argument("--rows", type=int, default=DEFAULT_ROW_COUNT, help="Number of rows to generate")
+    parser.add_argument(
+        "--rows", type=int, default=DEFAULT_ROW_COUNT, help="Number of rows to generate"
+    )
     args = parser.parse_args()
 
     cloud_config = get_cloud_config(args.cloud)
@@ -1059,10 +1160,14 @@ Examples:
 
     # Create Optuna study
     storage = f"sqlite:///{STUDY_DB}"
-    study_name = args.study_name or f"trino-iceberg-{args.cloud}-{args.mode}-{args.metric}"
+    study_name = (
+        args.study_name or f"trino-iceberg-{args.cloud}-{args.mode}-{args.metric}"
+    )
 
     metric_config = METRICS[args.metric]
-    direction = "maximize" if metric_config.direction.value == "maximize" else "minimize"
+    direction = (
+        "maximize" if metric_config.direction.value == "maximize" else "minimize"
+    )
 
     study = optuna.create_study(
         study_name=study_name,
@@ -1072,11 +1177,11 @@ Examples:
         load_if_exists=True,
     )
 
-    print(f"\n{'='*60}")
-    print(f"Trino-Iceberg Optimizer")
+    print(f"\n{'=' * 60}")
+    print("Trino-Iceberg Optimizer")
     print(f"Cloud: {args.cloud}, Mode: {args.mode}, Metric: {args.metric}")
     print(f"Trials: {args.trials}, Rows: {args.rows:,}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     try:
         if args.mode == "infra":
@@ -1104,7 +1209,9 @@ Examples:
             trino_ip = get_tf_output(tf, "trino_vm_ip") or TRINO_IP
 
             if not benchmark_ip:
-                print("Error: No infrastructure found. Run --mode infra first or create infrastructure manually.")
+                print(
+                    "Error: No infrastructure found. Run --mode infra first or create infrastructure manually."
+                )
                 return
 
             study.optimize(
@@ -1145,14 +1252,17 @@ Examples:
             # Get best infra from results
             store = get_store()
             results = [
-                r for r in store.as_dicts()
+                r
+                for r in store.as_dicts()
                 if r.get("cloud") == args.cloud and r.get("mode") == "infra"
             ]
             if not results:
                 print("No infra results found, cannot proceed to config optimization")
                 return
 
-            best_result = max(results, key=lambda r: get_metric(r, "lookup_by_id_per_sec"))
+            best_result = max(
+                results, key=lambda r: get_metric(r, "lookup_by_id_per_sec")
+            )
             best_infra = best_result.get("infra_config", {})
             print(f"\nBest infra: {infra_summary(best_infra)}")
 
@@ -1161,6 +1271,11 @@ Examples:
             tf = get_terraform(cloud_config.terraform_dir)
             benchmark_ip = get_tf_output(tf, "benchmark_vm_ip")
             trino_ip = get_tf_output(tf, "trino_vm_ip") or TRINO_IP
+
+            if not benchmark_ip:
+                raise RuntimeError(
+                    "Could not get benchmark VM IP for config optimization"
+                )
 
             study_config = optuna.create_study(
                 study_name=f"{study_name}-config",

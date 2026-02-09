@@ -113,7 +113,7 @@ class SystemBaseline(BaseModel):
 # Trial
 # ============================================================================
 
-ServiceType = Literal["meilisearch", "redis", "postgres", "minio"]
+ServiceType = Literal["meilisearch", "redis", "postgres", "minio", "trino-iceberg"]
 
 
 # ============================================================================
@@ -153,6 +153,13 @@ class Metrics(BaseModel):
     total_mib_s: float | None = Field(default=None, ge=0)
     get_mib_s: float | None = Field(default=None, ge=0)
     put_mib_s: float | None = Field(default=None, ge=0)
+
+    # Trino-Iceberg metrics
+    lookup_by_id_per_sec: float | None = Field(default=None, ge=0)
+    lookup_by_id_p50_ms: float | None = Field(default=None, ge=0)
+    lookup_by_id_p95_ms: float | None = Field(default=None, ge=0)
+    lookup_by_id_p99_ms: float | None = Field(default=None, ge=0)
+    total_lookups: int | None = Field(default=None, ge=0)
 
     # Common
     duration_s: float | None = Field(default=None, ge=0)

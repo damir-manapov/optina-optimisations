@@ -43,18 +43,20 @@ def get_config_search_space() -> dict:
         # Trino JVM settings
         "trino_heap_pct": [50, 60, 70, 80],  # % of RAM for JVM heap
         "trino_query_max_memory_pct": [30, 40, 50],  # % of heap for single query
-
         # Trino performance
         "task_concurrency": [4, 8, 16, 32],
         "task_writer_count": [1, 2, 4],
-
         # Iceberg table properties - compression
         "compression": ["zstd", "snappy", "lz4", "gzip", "none"],
         "compression_level": [1, 3, 6, 9],  # 1=fast, 9=best (for zstd/gzip)
-
         # Iceberg partitioning - sharding key determines data layout
-        "partition_key": ["none", "category", "created_date", "id_bucket_16", "id_bucket_64"],
-
+        "partition_key": [
+            "none",
+            "category",
+            "created_date",
+            "id_bucket_16",
+            "id_bucket_64",
+        ],
         # Iceberg write settings
         "target_file_size_mb": [64, 128, 256, 512],
     }
@@ -73,4 +75,4 @@ COMPRESSION_LEVELS = {
 def filter_compression_levels(compression: str, levels: list[int]) -> list[int]:
     """Filter compression levels to valid values for the algorithm."""
     valid = COMPRESSION_LEVELS.get(compression, [1])
-    return [l for l in levels if l in valid] or [valid[0]]
+    return [level for level in levels if level in valid] or [valid[0]]
