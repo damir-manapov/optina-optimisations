@@ -4,8 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from pydantic import TypeAdapter
-
 from .models import ServiceType, Trial
 
 
@@ -111,9 +109,11 @@ class TrialStore:
         other_trials = [t for t in all_trials if t.service != self.service]
         combined = other_trials + self.trials
 
-        # Use TypeAdapter for proper serialization
-        adapter = TypeAdapter(list[Trial])
-        data = adapter.dump_python(combined, mode="json")
+        # Serialize excluding None values and defaults (0.0) for cleaner JSON
+        data = [
+            t.model_dump(mode="json", exclude_none=True, exclude_defaults=True)
+            for t in combined
+        ]
 
         with open(self.path, "w") as f:
             json.dump(data, f, indent=2, default=str)
@@ -237,5 +237,4 @@ class TrialStore:
 
     def as_dicts(self) -> list[dict[str, Any]]:
         """Return all trials as dicts (for compatibility with existing code)."""
-        adapter = TypeAdapter(list[Trial])
-        return adapter.dump_python(self.trials, mode="json")
+        return [t.model_dump(mode="json") for t in self.trials]
