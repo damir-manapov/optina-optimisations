@@ -240,17 +240,17 @@ def generate_iceberg_table_properties(trino_config: dict) -> dict[str, str]:
 
 
 def get_partition_spec(partition_key: str) -> str:
-    """Get Iceberg partition specification SQL."""
+    """Get Iceberg partition specification for WITH clause (without WITH keyword)."""
     if partition_key == "none":
         return ""
     elif partition_key == "category":
-        return "WITH (partitioning = ARRAY['category'])"
+        return "partitioning = ARRAY['category']"
     elif partition_key == "created_date":
-        return "WITH (partitioning = ARRAY['day(created_at)'])"
+        return "partitioning = ARRAY['day(created_at)']"
     elif partition_key == "id_bucket_16":
-        return "WITH (partitioning = ARRAY['bucket(id, 16)'])"
+        return "partitioning = ARRAY['bucket(id, 16)']"
     elif partition_key == "id_bucket_64":
-        return "WITH (partitioning = ARRAY['bucket(id, 64)'])"
+        return "partitioning = ARRAY['bucket(id, 64)']"
     return ""
 
 
@@ -440,18 +440,20 @@ npx @mkven/samples-generation /tmp/benchmark_scenario.json \
     # Apply table properties (compression, partitioning) by recreating table
     # samples-generation creates a basic table, we need to recreate with our settings
     if table_props or partition_spec:
-        # Build WITH clause for table properties
-        props_clause = ""
+        # Build combined WITH clause for all table properties
+        with_items = []
+        if partition_spec:
+            with_items.append(partition_spec)
         if table_props:
-            props_items = ", ".join(f"'{k}' = '{v}'" for k, v in table_props.items())
-            props_clause = f"WITH ({props_items})"
+            with_items.extend(f"'{k}' = '{v}'" for k, v in table_props.items())
+
+        with_clause = f"WITH ({', '.join(with_items)})" if with_items else ""
 
         # Use full path to trino-cli
         recreate_cmd = f"""
 java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute "
 CREATE TABLE iceberg.warehouse.benchmark_opt
-{partition_spec}
-{props_clause}
+{with_clause}
 AS SELECT * FROM iceberg.warehouse.benchmark
 " 2>&1 && \\
 java -jar /opt/trino/trino-cli.jar --server localhost:8080 --execute "DROP TABLE iceberg.warehouse.benchmark" 2>&1 && \\
